@@ -2,6 +2,7 @@ package com.kp.recapstudio;
 
 import android.Manifest;
 import android.app.Activity;
+import android.app.AlertDialog;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
@@ -38,6 +39,7 @@ import com.tom_roush.pdfbox.android.PDFBoxResourceLoader;
 import com.tom_roush.pdfbox.pdmodel.PDDocument;
 import com.tom_roush.pdfbox.text.PDFTextStripper;
 import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
 import java.util.*;
 
 public class MainActivity extends Activity implements TextToSpeech.OnInitListener {
@@ -74,7 +76,7 @@ public class MainActivity extends Activity implements TextToSpeech.OnInitListene
     private List<String> speechParts = new ArrayList<>();
     private List<File> audioParts = new ArrayList<>();
     private int speechPosition = 0;
-    private File completedWav = null;
+    private File completedWav = null, wavWorkingFolder = null;
 
     @Override public void onCreate(Bundle state) {
         super.onCreate(state);
@@ -333,9 +335,16 @@ public class MainActivity extends Activity implements TextToSpeech.OnInitListene
         addButton("🇲🇲 မြန်မာ Offline Voice ရွေး", SURFACE, v -> chooseVoice("my"));
         addButton("🇬🇧 English Offline Voice ရွေး", SURFACE, v -> chooseVoice("en"));
         addButton("▶ စာအုပ်ဖတ်ရန်", PURPLE, v -> beginSpeak());
-        addButton("⬇ Long WAV Audio ထုတ်ရန်", TEAL, v -> beginWav());
+        addButton("⬇ Generate / Resume Long WAV", TEAL, v -> beginWav());
         addButton("■ ရပ်ရန် / Cancel", SURFACE, v -> stopSpeech());
         addButton("💾 စာသားသိမ်းရန်", SURFACE, v -> { saveDrafts(); status("စာသားကို ဖုန်းထဲမှာ သိမ်းပြီး"); });
+        addButton("🧹 အသံထုတ်ရန် သိမ်းထားတဲ့ Chunks ရှင်းရန်", SURFACE, v ->
+            new AlertDialog.Builder(this)
+                .setTitle("Delete WAV progress files?")
+                .setMessage("ဤလုပ်ဆောင်ချက်က အရင် Generate လုပ်ထားတဲ့ WAV အပိုင်းတွေကို ဖျက်ပါမယ်။ ပြန်စရင် အစကနေ Generate လုပ်ရမယ်။")
+                .setNegativeButton("Cancel", (dialog, which) -> {})
+                .setPositiveButton("Delete", (dialog, which) -> clearWavProgress())
+                .show());
         note("အသံရှည်ကို အပိုင်းလိုက် Generate လုပ်ပြီး WAV အဖြစ် ပေါင်းပါတယ်။ အသံဖိုင်အရှည်က Device Storage, TTS Engine နဲ့ WAV Format Limit ပေါ်မူတည်ပါတယ်။");
     }
 
@@ -618,6 +627,11 @@ public class MainActivity extends Activity implements TextToSpeech.OnInitListene
         if (result == TextToSpeech.ERROR) stopWithError("TTS speak failed");
     }
 
+    /**
+     * Resumable offline TTS: generated chunks remain in app-private storage
+     * under a key derived from the exact book text and chosen offline voice.
+     * Changing the text or voice cannot silently reuse another recording.
+     */
     private void beginWav() {
         if (book.trim().isEmpty()) { status("စာအုပ်စာသား ထည့်ပါ"); return; }
         if (!assureOfflineVoice()) return;
@@ -625,37 +639,84 @@ public class MainActivity extends Activity implements TextToSpeech.OnInitListene
         cancelled = false; exporting = true;
         speechParts = splitText(book, 260);
         speechPosition = 0; audioParts.clear(); completedWav = null;
-        File folder = new File(getCacheDir(), "kp-tts-parts");
-        if (!folder.exists() && !folder.mkdirs()) { stopWithError("Cannot create audio cache"); return; }
-        for (File f : Objects.requireNonNull(folder.listFiles())) f.delete();
-        status("WAV generation: " + speechParts.size() + " chunks");
-        nextWav();
+        try {
+            String voice = tts.getVoice().getName();
+            String hash = sha256Hex(voice + "\\u0000" + book);
+            wavWorkingFolder = new File(new File(getFilesDir(),"kp-recapped-wav-jobs"), hash.substring(0, 28));
+            if (!wavWorkingFolder.exists() && !wavWorkingFolder.mkdirs())
+                throw new IOException("Cannot create persistent WAV work directory");
+            File[] stored = wavWorkingFolder.listFiles();
+            status("WAV: " + speechParts.size() + " segments; saved pieces: " +
+                (stored == null ? 0 : stored.length));
+            nextWav();
+        } catch (Exception e) {
+            exporting = false;
+            status("WAV initialization failed: " + e.getMessage());
+        }
+    }
+
+    private static String sha256Hex(String input) throws Exception {
+        byte[] b = MessageDigest.getInstance("SHA-256").digest(
+            input.getBytes(StandardCharsets.UTF_8));
+        StringBuilder s = new StringBuilder();
+        for (byte x : b) s.append(String.format(Locale.ROOT,"%02x",x & 255));
+        return s.toString();
     }
 
     private void nextWav() {
         if (!exporting || cancelled) return;
-        if (speechPosition >= speechParts.size()) {
-            exporting = false;
-            status("Merging " + audioParts.size() + " WAV chunks ...");
-            final List<File> files = new ArrayList<>(audioParts);
-            new Thread(() -> {
+        // Skip previously generated valid WAV pieces without an unbounded recursive call.
+        while (speechPosition < speechParts.size()) {
+            int n = speechPosition++;
+            File file = new File(wavWorkingFolder, String.format(Locale.US, "%06d.wav", n));
+            if (file.isFile() && file.length() > 44) {
                 try {
-                    File f = new File(getCacheDir(), "kp-recap-audiobook.wav");
-                    mergeWavs(files, f);
-                    completedWav = f;
-                    post("Long WAV ready! Save ကိုရွေးနိုင်ပြီ");
-                    ui.post(() -> createDocument(SAVE_WAV, "audio/wav", "KP-Audiobook.wav"));
-                } catch (Exception e) { post("Audio merge error: " + e.getMessage()); }
-            }).start();
+                    inspectWav(file);
+                    audioParts.add(file);
+                    continue;
+                } catch (IOException ignored) { file.delete(); }
+            }
+            audioParts.add(file);
+            status("Offline WAV: " + speechPosition + "/" + speechParts.size()
+                + " (resume supported)");
+            int result = tts.synthesizeToFile(speechParts.get(n), new Bundle(), file, "WAV_" + n);
+            if (result == TextToSpeech.ERROR) stopWithError("TTS failed at segment " + n);
             return;
         }
-        int n = speechPosition++;
-        File dir = new File(getCacheDir(), "kp-tts-parts");
-        File file = new File(dir, String.format(Locale.US, "%06d.wav", n));
-        audioParts.add(file);
-        status("Offline WAV: " + speechPosition + "/" + speechParts.size());
-        int result = tts.synthesizeToFile(speechParts.get(n), new Bundle(), file, "WAV_" + n);
-        if (result == TextToSpeech.ERROR) stopWithError("TTS WAV file failed at segment " + n);
+
+        exporting = false;
+        status("Merging " + audioParts.size() + " WAV chunks ...");
+        final List<File> files = new ArrayList<>(audioParts);
+        new Thread(() -> {
+            try {
+                File f = new File(getCacheDir(), "kp-recap-audiobook.wav");
+                mergeWavs(files, f);
+                completedWav = f;
+                post("Long WAV ready; choose folder to save");
+                ui.post(() -> {
+                    if (!isFinishing() && !isDestroyed())
+                        createDocument(SAVE_WAV, "audio/wav", "KP-Audiobook.wav");
+                });
+            } catch (Exception e) { post("Audio merge error: " + e.getMessage()); }
+        }, "KP-WAV-Merge").start();
+    }
+
+    private void clearWavProgress() {
+        stopSpeech();
+        File root = new File(getFilesDir(), "kp-recapped-wav-jobs");
+        long[] deleted = new long[2];
+        removeFilesRecursively(root, deleted);
+        wavWorkingFolder = null; audioParts.clear();
+        status("WAV cache removed: " + deleted[0] + " files");
+    }
+
+    private void removeFilesRecursively(File root, long[] counts) {
+        if (root == null || !root.exists()) return;
+        if (root.isDirectory()) {
+            File[] children = root.listFiles();
+            if (children != null) for (File f : children) removeFilesRecursively(f, counts);
+        } else counts[0]++;
+        root.delete();
     }
 
     private void stopSpeech() {
