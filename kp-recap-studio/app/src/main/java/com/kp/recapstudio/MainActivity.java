@@ -266,7 +266,7 @@ public class MainActivity extends Activity implements TextToSpeech.OnInitListene
                 row.addView(thumb, new LinearLayout.LayoutParams(dp(110), dp(72)));
                 TextView cue = new TextView(this);
                 cue.setText("Scene " + String.format(Locale.US,"%02d", index) +
-                    "\\n" + sceneStamp(scene.timeMs) + "  •  Tap to seek");
+                    "\n" + sceneStamp(scene.timeMs) + "  •  Tap to seek");
                 cue.setTextColor(WHITE);
                 cue.setTextSize(14);
                 cue.setPadding(dp(12), 0, dp(3), 0);
@@ -287,7 +287,7 @@ public class MainActivity extends Activity implements TextToSpeech.OnInitListene
                     LocalSceneAnalyzer.Scene scene = videoScenes.get(j);
                     guide.append("Scene ").append(j + 1).append(" [")
                         .append(sceneStamp(scene.timeMs))
-                        .append("] — [ဒီအခန်းကို ကြည့်ပြီး ဇာတ်ညွှန်းရေးရန်]").append("\\n");
+                        .append("] — [ဒီအခန်းကို ကြည့်ပြီး ဇာတ်ညွှန်းရေးရန်]").append("\n");
                 }
                 transcript = guide.toString();
                 saveDrafts();
@@ -641,7 +641,7 @@ public class MainActivity extends Activity implements TextToSpeech.OnInitListene
         speechPosition = 0; audioParts.clear(); completedWav = null;
         try {
             String voice = tts.getVoice().getName();
-            String hash = sha256Hex(voice + "\\u0000" + book);
+            String hash = sha256Hex(voice + "|" + book);
             wavWorkingFolder = new File(new File(getFilesDir(),"kp-recapped-wav-jobs"), hash.substring(0, 28));
             if (!wavWorkingFolder.exists() && !wavWorkingFolder.mkdirs())
                 throw new IOException("Cannot create persistent WAV work directory");
@@ -704,10 +704,13 @@ public class MainActivity extends Activity implements TextToSpeech.OnInitListene
     private void clearWavProgress() {
         stopSpeech();
         File root = new File(getFilesDir(), "kp-recapped-wav-jobs");
-        long[] deleted = new long[2];
-        removeFilesRecursively(root, deleted);
         wavWorkingFolder = null; audioParts.clear();
-        status("WAV cache removed: " + deleted[0] + " files");
+        status("Deleting saved WAV chunks…");
+        new Thread(() -> {
+            long[] deleted = new long[2];
+            removeFilesRecursively(root, deleted);
+            post("WAV cache removed: " + deleted[0] + " files");
+        }, "KP-WAV-Cleanup").start();
     }
 
     private void removeFilesRecursively(File root, long[] counts) {
