@@ -1191,7 +1191,11 @@ public class MainActivity extends Activity implements TextToSpeech.OnInitListene
     private void post(String s) { ui.post(() -> status(s)); }
     @Override protected void onPause() { saveDrafts(); super.onPause(); }
     @Override protected void onDestroy() {
-        cancelSubtitleExport();
+        if (subtitleTransformer != null) {
+            try { subtitleTransformer.cancel(); } catch (Exception ignored) {}
+            subtitleTransformer = null;
+        }
+        exportingSubtitleVideo = false;
         stopSpeech();
         clearVideoScenes();
         closePdf();
