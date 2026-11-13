@@ -19,6 +19,7 @@ android {
 }
 
 dependencies {
+    testImplementation 'junit:junit:4.13.2'
     // On-device text extraction for text-based PDFs, not scanned-image OCR.
     implementation 'com.tom-roush:pdfbox-android:2.0.27.0'
     implementation 'androidx.media3:media3-transformer:1.11.1'
