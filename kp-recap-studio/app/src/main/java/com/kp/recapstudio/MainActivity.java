@@ -44,7 +44,7 @@ import java.util.*;
 
 public class MainActivity extends Activity implements TextToSpeech.OnInitListener {
     private static final int VIDEO = 101, TXT = 102, AUDIO = 103, PDF = 104;
-    private static final int SAVE_SRT = 105, SAVE_WAV = 106, MIC = 107;
+    private static final int SAVE_SRT = 105, SAVE_WAV = 106, MIC = 107, SAVE_MP4 = 108;
     private final int BACKGROUND = Color.rgb(11, 16, 31), SURFACE = Color.rgb(24, 31, 54);
     private final int WHITE = Color.rgb(238, 239, 255), MUTED = Color.rgb(169, 180, 208);
     private final int ACCENT = Color.rgb(152, 74, 252);
@@ -58,7 +58,7 @@ public class MainActivity extends Activity implements TextToSpeech.OnInitListene
     private Uri videoUri, sampleUri, pdfUri;
     private List<LocalSceneAnalyzer.Scene> videoScenes = new ArrayList<>();
     private long videoDurationMs = 0;
-    private boolean analyzingScenes = false, extractingPdf = false;
+    private boolean analyzingScenes = false, extractingPdf = false, exportingMontage = false;
     private VideoView player;
     private TextToSpeech tts;
     private boolean ttsReady = false, recording = false;
@@ -281,6 +281,12 @@ public class MainActivity extends Activity implements TextToSpeech.OnInitListene
                     }
                 });
             }
+            addButton(exportingMontage ? "🎞 MP4 Video Export လုပ်ဆောင်နေသည်…" :
+                "⬇ MP4 Silent Scene Montage ထုတ်ရန်", PURPLE, v -> {
+                if (exportingMontage) { status("MP4 export in progress"); return; }
+                createDocument(SAVE_MP4, "video/mp4", "KP-Scene-Montage.mp4");
+            });
+            note("Offline Video Montage သည် Video ရဲ့ Short Scenes များကိုသာ MP4 ပြန်ပေါင်းတာပါ။ Voice Narration၊ Auto Subtitle မပါသေးပါ။ MP4 H.264/H.265 အတွက်သာ ရည်ရွယ်ထားပါတယ်။");
             addButton("📝 Scene Timestamp Notes → Transcript", TEAL, v -> {
                 StringBuilder guide = new StringBuilder();
                 for (int j = 0; j < videoScenes.size(); j++) {
@@ -381,6 +387,35 @@ public class MainActivity extends Activity implements TextToSpeech.OnInitListene
         addButton("← Previous Page", SURFACE, v -> { pdfPage--; drawPdf(); });
         addButton("Next Page →", SURFACE, v -> { pdfPage++; drawPdf(); });
         drawPdf();
+    }
+
+    private void exportSceneVideo(Uri output) {
+        if (exportingMontage) { status("An export is already running"); return; }
+        if (videoUri == null || videoScenes.isEmpty()) {
+            status("Video နဲ့ Scene Hints အရင် Generate လုပ်ပါ");
+            return;
+        }
+        exportingMontage = true;
+        final Uri source = videoUri;
+        final List<LocalSceneAnalyzer.Scene> chosen = new ArrayList<>(videoScenes);
+        final long duration = videoDurationMs;
+        status("Offline MP4 montage export started");
+        new Thread(() -> {
+            try {
+                long frames = OfflineVideoMontage.write(this, source, output,
+                    chosen, duration, this::post);
+                ui.post(() -> {
+                    exportingMontage = false;
+                    if (currentTab == 1) showInterface();
+                    status("Silent MP4 video saved (" + frames + " encoded samples). No narration.");
+                });
+            } catch (Exception e) {
+                ui.post(() -> {
+                    exportingMontage = false;
+                    status("MP4 export error: " + e.getMessage());
+                });
+            }
+        }, "KP-MP4-Export").start();
     }
 
     private void clearVideoScenes() {
@@ -517,6 +552,8 @@ public class MainActivity extends Activity implements TextToSpeech.OnInitListene
                 pdfPage = 0; pdfName = uri.getLastPathSegment();
                 currentTab = 4; showInterface();
                 status("Offline PDF open");
+            } else if (req == SAVE_MP4) {
+                exportSceneVideo(uri);
             } else if (req == SAVE_SRT) {
                 try (OutputStream out = getContentResolver().openOutputStream(uri)) {
                     if (out == null) throw new IOException("Output denied");
