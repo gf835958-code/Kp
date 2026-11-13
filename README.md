@@ -1,9 +1,11 @@
-# KP Movie Recap Studio v0.2 — Android App
+# KP Movie Recap Studio v0.3 — Android App
 
 Standalone source for a **free, offline-first** Android 8.0+ APK (tested build target: Android 15). Purple/cyan WebView UI and native Android processing bridges.
 
 ## Features already implemented in source
 
+- **Built-in 15s offline demonstration video** generated from 5 color scenes at GitHub build time: tap `Demo Video` and it scans automatically, fills an explicitly prewritten sample script, and enables MP4 and SRT export. This is sample narration only, not AI interpretation.
+- **Auto Scan + Highlight MP4** button offers a one-tap scene scan + opens the native Save As screen for the MP4. Clip duration is configurable; source proportions are preserved.
 - Android Storage Access Framework video import (`video/*`), thumbnail-based scene sampling, scene notes.
 - Editable Myanmar/English script draft based on notes. No claim of full-movie AI interpretation.
 - Device TTS voice preview and experimental TTS audio file export (language voice must be installed, engine-specific output format).
@@ -19,7 +21,7 @@ Standalone source for a **free, offline-first** Android 8.0+ APK (tested build t
 
 1. Create a fresh repository (recommended name: `KP-Movie-Recap-Studio`) and upload the contents **as files at the repository root**, keeping all folders.
 2. Push to `main` (or run `Build KP Movie Recap APK` in GitHub Actions). Build environment uses Gradle 8.10.2, Android Gradle Plugin 8.7.3, compileSdk 35, JDK 17.
-3. On successful GitHub Actions run, tap the `KP-Movie-Recap-v0.2-APK` artifact; extract it; install `app-debug.apk` on Android. GitHub stores Actions artifacts compressed even when the contents are APKs.
+3. On successful GitHub Actions run, tap the `KP-Movie-Recap-v0.3-APK` artifact; extract it; install `app-debug.apk` on Android. GitHub stores Actions artifacts compressed even when the contents are APKs.
 4. If installed earlier app with a different certificate, uninstall older test app before installing. This will erase locally stored app data.
 
 ## Security and data use
