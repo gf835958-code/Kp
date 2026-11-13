@@ -7,6 +7,7 @@ import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
 import android.graphics.Color;
 import android.graphics.drawable.GradientDrawable;
+import android.graphics.drawable.Drawable;
 import android.graphics.pdf.PdfRenderer;
 import android.media.MediaPlayer;
 import android.media.MediaRecorder;
@@ -41,6 +42,7 @@ public class MainActivity extends Activity implements TextToSpeech.OnInitListene
     private static final int SAVE_SRT = 105, SAVE_WAV = 106, MIC = 107;
     private final int BACKGROUND = Color.rgb(11, 16, 31), SURFACE = Color.rgb(24, 31, 54);
     private final int WHITE = Color.rgb(238, 239, 255), MUTED = Color.rgb(169, 180, 208);
+    private final int ACCENT = Color.rgb(152, 74, 252);
     private final int PURPLE = Color.rgb(122, 85, 238), TEAL = Color.rgb(30, 191, 191);
     private final Handler ui = new Handler(Looper.getMainLooper());
 
@@ -85,27 +87,39 @@ public class MainActivity extends Activity implements TextToSpeech.OnInitListene
         outer.setBackgroundColor(BACKGROUND);
         setContentView(outer);
 
+        LinearLayout top = new LinearLayout(this);
+        top.setOrientation(LinearLayout.HORIZONTAL);
+        top.setGravity(Gravity.CENTER_VERTICAL);
+        top.setPadding(dp(17), dp(13), dp(16), dp(13));
+        GradientDrawable headerBg = new GradientDrawable(GradientDrawable.Orientation.TL_BR,
+                new int[]{Color.rgb(35, 17, 65), Color.rgb(13, 17, 33)});
+        top.setBackground(headerBg);
+        ImageView logo = new ImageView(this);
+        logo.setImageResource(com.kp.recapstudio.R.drawable.kp_logo);
+        top.addView(logo, new LinearLayout.LayoutParams(dp(62), dp(62)));
+        LinearLayout headerText = new LinearLayout(this);
+        headerText.setPadding(dp(12), 0, 0, 0);
+        headerText.setOrientation(LinearLayout.VERTICAL);
         TextView brand = new TextView(this);
-        brand.setText("✦ KP RECAP STUDIO");
+        brand.setText("KP Recap Studio");
         brand.setTextColor(WHITE);
-        brand.setTextSize(23);
+        brand.setTextSize(20);
         brand.setTypeface(null, 1);
-        brand.setPadding(dp(18), dp(20), dp(16), dp(4));
-        outer.addView(brand);
-
+        headerText.addView(brand);
         TextView subtitle = new TextView(this);
-        subtitle.setText("Native Android • Local Files • Offline Tools");
-        subtitle.setTextColor(MUTED);
-        subtitle.setTextSize(12);
-        subtitle.setPadding(dp(18), 0, dp(16), dp(14));
-        outer.addView(subtitle);
+        subtitle.setText("MOVIE RECAP  •  AUDIOBOOK  •  VOICE");
+        subtitle.setTextColor(Color.rgb(186, 155, 239));
+        subtitle.setTextSize(10);
+        headerText.addView(subtitle);
+        top.addView(headerText);
+        outer.addView(top);
 
         HorizontalScrollView hs = new HorizontalScrollView(this);
         hs.setHorizontalScrollBarEnabled(false);
         LinearLayout tabs = new LinearLayout(this);
         tabs.setOrientation(LinearLayout.HORIZONTAL);
         hs.addView(tabs);
-        String[] names = {"🎬 Recap", "📚 Audiobook", "🎙 Voice Lab", "📄 PDF"};
+        String[] names = {"⌂ Home", "🎬 Recap", "📚 Audiobook", "🎙 Voice", "📄 PDF"};
         for (int i = 0; i < names.length; i++) {
             final int n = i;
             Button b = button(names[i], i == currentTab ? PURPLE : SURFACE);
@@ -133,11 +147,83 @@ public class MainActivity extends Activity implements TextToSpeech.OnInitListene
         outer.addView(info);
 
         switch (currentTab) {
-            case 0: renderRecap(); break;
-            case 1: renderBook(); break;
-            case 2: renderVoiceLab(); break;
+            case 0: renderHome(); break;
+            case 1: renderRecap(); break;
+            case 2: renderBook(); break;
+            case 3: renderVoiceLab(); break;
             default: renderPdf(); break;
         }
+    }
+
+    private void renderHome() {
+        title("✦ Your Creative Studio");
+        note("Offline-first Android Creator • Purple Neon Edition");
+        LinearLayout hero = new LinearLayout(this);
+        hero.setOrientation(LinearLayout.VERTICAL);
+        hero.setPadding(dp(20), dp(21), dp(18), dp(18));
+        GradientDrawable heroBg = new GradientDrawable(GradientDrawable.Orientation.TL_BR,
+                new int[]{Color.rgb(106, 34, 180), Color.rgb(35, 23, 79), Color.rgb(13, 24, 52)});
+        heroBg.setCornerRadius(dp(22));
+        hero.setBackground(heroBg);
+        TextView badge = new TextView(this);
+        badge.setText("✦  KP CREATOR LAB");
+        badge.setTextColor(Color.rgb(223, 185, 255));
+        badge.setTextSize(12);
+        badge.setTypeface(null,1);
+        hero.addView(badge);
+        TextView big = new TextView(this);
+        big.setText("Create stories.\\nGive words a voice.");
+        big.setTextColor(Color.WHITE);
+        big.setTextSize(25);
+        big.setTypeface(null,1);
+        big.setPadding(0,dp(15),0,dp(10));
+        hero.addView(big);
+        TextView small = new TextView(this);
+        small.setText("🎬 Video   •   📚 Audiobooks   •   🎙 Voice Lab");
+        small.setTextColor(Color.rgb(222, 208, 244));
+        small.setTextSize(13);
+        hero.addView(small);
+        panel.addView(hero, new LinearLayout.LayoutParams(-1, dp(190)));
+        label("Quick tools");
+        LinearLayout first = new LinearLayout(this);
+        first.setOrientation(LinearLayout.HORIZONTAL);
+        panel.addView(first, new LinearLayout.LayoutParams(-1, dp(148)));
+        toolCard(first, "🎬", "Movie Recap", "Video • Script • SRT", 1, PURPLE);
+        toolCard(first, "📚", "Audiobook", "Offline TTS • WAV", 2, Color.rgb(19, 138, 186));
+        LinearLayout second = new LinearLayout(this);
+        second.setOrientation(LinearLayout.HORIZONTAL);
+        LinearLayout.LayoutParams row = new LinearLayout.LayoutParams(-1, dp(148));
+        row.topMargin = dp(8);
+        panel.addView(second,row);
+        toolCard(second, "🎙", "Voice Lab", "Record • Import", 3, Color.rgb(138, 48, 157));
+        toolCard(second, "📄", "PDF Reader", "Offline PDF Pages", 4, Color.rgb(38, 108, 130));
+        label("Studio status");
+        note("✓ No website wrapper • Local files • No required API Key\\n" +
+             "ⓘ Voice cloning AI, automatic video transcription and MP4 rendering are not installed yet.");
+    }
+
+    private void toolCard(LinearLayout row, String icon, String name, String detail, int tab, int tint) {
+        LinearLayout card = new LinearLayout(this);
+        card.setOrientation(LinearLayout.VERTICAL);
+        card.setGravity(Gravity.CENTER_VERTICAL);
+        card.setPadding(dp(13),dp(12),dp(8),dp(10));
+        GradientDrawable background = new GradientDrawable(GradientDrawable.Orientation.TL_BR,
+                new int[]{tint, Color.rgb(29, 24, 58), SURFACE});
+        background.setCornerRadius(dp(18));
+        background.setStroke(dp(1), Color.rgb(89, 65, 139));
+        card.setBackground(background);
+        TextView symbol = new TextView(this);
+        symbol.setText(icon); symbol.setTextSize(27); card.addView(symbol);
+        TextView nameView = new TextView(this);
+        nameView.setText(name); nameView.setTextColor(WHITE); nameView.setTextSize(15);
+        nameView.setTypeface(null,1); nameView.setPadding(0,dp(6),0,dp(4)); card.addView(nameView);
+        TextView sub = new TextView(this);
+        sub.setText(detail); sub.setTextColor(Color.rgb(205, 195, 224)); sub.setTextSize(11);
+        card.addView(sub);
+        LinearLayout.LayoutParams p = new LinearLayout.LayoutParams(0,-1,1);
+        p.setMargins(dp(3),0,dp(3),0);
+        row.addView(card,p);
+        card.setOnClickListener(v -> { saveDrafts(); currentTab = tab; showInterface(); });
     }
 
     private void renderRecap() {
@@ -250,21 +336,21 @@ public class MainActivity extends Activity implements TextToSpeech.OnInitListene
         Uri uri = data.getData();
         try {
             if (req == VIDEO) {
-                videoUri = uri; currentTab = 0; showInterface();
+                videoUri = uri; currentTab = 1; showInterface();
                 status("Video Imported (Local Preview)");
             } else if (req == TXT) {
-                book = readText(uri); saveDrafts(); currentTab = 1; showInterface();
+                book = readText(uri); saveDrafts(); currentTab = 2; showInterface();
                 status("TXT Import အောင်မြင်");
             } else if (req == AUDIO) {
                 sampleUri = uri; sampleName = "Sample: " + uri.getLastPathSegment();
-                currentTab = 2; showInterface(); status("Sample audio ready — cloning is not installed");
+                currentTab = 3; showInterface(); status("Sample audio ready — cloning is not installed");
             } else if (req == PDF) {
                 closePdf();
                 pdfFd = getContentResolver().openFileDescriptor(uri, "r");
                 if (pdfFd == null) throw new IOException("PDF not readable");
                 pdf = new PdfRenderer(pdfFd);
                 pdfPage = 0; pdfName = uri.getLastPathSegment();
-                currentTab = 3; showInterface();
+                currentTab = 4; showInterface();
                 status("Offline PDF open");
             } else if (req == SAVE_SRT) {
                 try (OutputStream out = getContentResolver().openOutputStream(uri)) {
@@ -660,8 +746,10 @@ public class MainActivity extends Activity implements TextToSpeech.OnInitListene
     private Button button(String s, int color) {
         Button b = new Button(this);
         b.setText(s); b.setTextColor(WHITE); b.setTextSize(13); b.setAllCaps(false);
-        GradientDrawable bg = new GradientDrawable();
-        bg.setColor(color); bg.setCornerRadius(dp(13)); b.setBackground(bg);
+        GradientDrawable bg = new GradientDrawable(GradientDrawable.Orientation.TL_BR,
+            new int[]{color, color == SURFACE ? Color.rgb(36, 29, 70) : Color.rgb(63, 32, 126)});
+        bg.setCornerRadius(dp(13)); bg.setStroke(dp(1),Color.rgb(93, 61, 143));
+        b.setBackground(bg);
         return b;
     }
     private void addButton(String s, int color, View.OnClickListener listener) {
