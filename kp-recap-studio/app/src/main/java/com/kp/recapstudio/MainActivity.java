@@ -65,7 +65,7 @@ public class MainActivity extends Activity implements TextToSpeech.OnInitListene
     private boolean analyzingScenes = false, extractingPdf = false, exportingMontage = false, exportingNarration = false, exportingSubtitleVideo = false;
     private Transformer subtitleTransformer;
     private Uri quickOutputUri;
-    private boolean quickExportRunning = false;
+    private boolean quickExportRunning = false, transcribingVideo = false;
     private String quickOriginalBook = null;
     private VideoView player;
     private TextToSpeech tts;
@@ -246,18 +246,18 @@ public class MainActivity extends Activity implements TextToSpeech.OnInitListene
         title("🎬 Movie Recap");
         note("ကိုယ်ပိုင် Video ကို ဖုန်းထဲကနေ ဖွင့်ကြည့်ပြီး Transcript ထည့်နိုင်ပါတယ်။ Video ကို AI နဲ့ အလိုအလျောက် နားလည်ခြင်း မပါသေးပါ။");
         addButton("📂 Video ဖိုင်ရွေးရန်", TEAL, v -> pick(VIDEO, "video/*"));
+        addButton(transcribingVideo ? "⏳ Whisper Transcript လုပ်ဆောင်နေသည်…" :
+            "🎧 Video Sound → Offline Burmese Transcript", TEAL,
+            v -> transcribeVideoAudio(null));
+        note("Whisper Tiny AI က Video ထဲက စကားသံကို ဖုန်းပေါ်မှာပဲ စာပြောင်းမယ်။ ဇာတ်ကွက်ပုံရိပ်တွေကို AI နားလည်တာ မဟုတ်ပါ။ အသံမပါတဲ့ Video မှာ Script မထုတ်နိုင်ပါ။");
         addButton(quickExportRunning ? "⏳ Offline Recap Export လုပ်နေသည်…" :
             "✦ 1-TAP: Video + Script → Voiceover + Subtitles MP4", PURPLE, v -> {
             if (quickExportRunning) { status("Quick export already in progress"); return; }
             if (videoUri == null) { status("Video ဖိုင်ထည့်ပါ"); return; }
-            if (recap.trim().isEmpty() && transcript.trim().isEmpty()) {
-                status("ဇာတ်ညွှန်းစာသား / Transcript ထည့်ပါ။ Video ကို AI နဲ့ အလိုအလျောက် နားမလည်နိုင်သေးပါ။");
-                return;
-            }
             if (!assureOfflineVoice()) return;
             createDocument(SAVE_QUICK_MP4, "video/mp4", "KP-Quick-Recap.mp4");
         });
-        note("1-TAP Mode မှာ Video + ထည့်ထားပြီးသား Transcript/Script လိုပါတယ်။ ဖုန်းထဲရှိ Offline TTS အသံကိုသာ သုံးပြီး မြန်မာ Clone Voice မဟုတ်ပါ။ Subtitle အချိန်ကို အသံဖိုင်အရှည်အပေါ်မူတည်ပြီး ခန့်မှန်းခွဲထားတာဖြစ်ကာ စကားလုံးအလိုက် Auto Sync မဟုတ်သေးပါ။");
+        note("1-TAP Mode မှာ Script မရှိရင် Video စကားသံကို Offline Whisper နဲ့ စာပြောင်းပြီး အခြေခံစကားပြောအကျဉ်းချုပ် ထုတ်မယ်။ Video ပုံရိပ်ကို AI နားလည်တာ မဟုတ်ပါ။ ဖုန်းထဲရှိ Offline TTS အသံကိုသာ သုံးပြီး မြန်မာ Clone Voice မဟုတ်ပါ။ Subtitle အချိန်ကို အသံဖိုင်အရှည်အပေါ်မူတည်ပြီး ခန့်မှန်းခွဲထားတာဖြစ်ကာ စကားလုံးအလိုက် Auto Sync မဟုတ်သေးပါ။");
         if (quickExportRunning) {
             addButton("■ Stop Quick Export", SURFACE, v -> {
                 quickExportRunning = false;
@@ -497,6 +497,11 @@ public class MainActivity extends Activity implements TextToSpeech.OnInitListene
         if (quickExportRunning) { status("Quick export already active"); return; }
         if (videoUri == null) { status("Choose a video first"); return; }
         if (!assureOfflineVoice()) return;
+        if (recap.trim().isEmpty() && transcript.trim().isEmpty()) {
+            status("Step 0/4 — Offline speech transcription from movie audio");
+            transcribeVideoAudio(() -> startQuickRecap(destination));
+            return;
+        }
         if (recap.trim().isEmpty()) {
             StringBuilder result = new StringBuilder();
             for (String part : transcript.split("[။.!?\\n]+")) {
@@ -734,6 +739,64 @@ public class MainActivity extends Activity implements TextToSpeech.OnInitListene
     private String sceneStamp(long ms) {
         return String.format(Locale.US, "%02d:%02d:%02d", ms / 3600000,
             (ms / 60000) % 60, (ms / 1000) % 60);
+    }
+
+    private static String extractiveSpeechSummary(String text) {
+        if (text == null || text.trim().isEmpty()) return "";
+        StringBuilder b = new StringBuilder();
+        int sentences = 0;
+        for (String sentence : text.split("[။.!?\\n]+")) {
+            String chunk = sentence.trim();
+            if (chunk.isEmpty()) continue;
+            if (b.length() > 0) b.append("။\\n");
+            b.append(chunk);
+            if (++sentences >= 16 || b.length() > 4000) break;
+        }
+        return b.toString();
+    }
+
+    private void transcribeVideoAudio(Runnable afterSuccessfulTranscript) {
+        if (videoUri == null) { status("Video အရင် Import လုပ်ပါ"); return; }
+        if (transcribingVideo) { status("Whisper ASR already working"); return; }
+        final Uri source = videoUri;
+        transcribingVideo = true;
+        status("Step 1 — Extracting soundtrack locally, no network");
+        new Thread(() -> {
+            final File wav = new File(getCacheDir(), "kp-video-whisper16k.wav");
+            try {
+                VideoAudioToWav.extract(this, source, wav, this::post);
+                post("Step 2 — Whisper Tiny model transcribing Burmese speech Offline");
+                OfflineWhisperBridge.transcribeAsync(this, wav,
+                    new OfflineWhisperBridge.Callback() {
+                    @Override public void onText(String recognized) {
+                        transcribingVideo = false;
+                        wav.delete();
+                        if (isFinishing() || isDestroyed() || !source.equals(videoUri)) return;
+                        if (recognized.trim().isEmpty()) {
+                            status("Offline ASR didn't detect speech. Video may be silent.");
+                            return;
+                        }
+                        transcript = recognized.trim();
+                        if (recap.trim().isEmpty()) recap = extractiveSpeechSummary(transcript);
+                        saveDrafts();
+                        if (currentTab == 1) showInterface();
+                        status("Whisper local transcript ready. Review recognition errors; visual scenes not understood.");
+                        if (afterSuccessfulTranscript != null) afterSuccessfulTranscript.run();
+                    }
+                    @Override public void onError(String message) {
+                        transcribingVideo = false;
+                        wav.delete();
+                        status("Offline Whisper ASR: " + message);
+                    }
+                });
+            } catch (Exception e) {
+                ui.post(() -> {
+                    transcribingVideo = false;
+                    wav.delete();
+                    status("Video soundtrack error: " + e.getMessage());
+                });
+            }
+        }, "KP-Offline-Video-ASR").start();
     }
 
     private void findVideoScenes() {
