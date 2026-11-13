@@ -24,6 +24,7 @@ import org.json.JSONObject;
 import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.FileOutputStream;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
@@ -44,7 +45,7 @@ public final class MainActivity extends Activity {
     private final ExecutorService io = Executors.newSingleThreadExecutor();
     private WebView webView;
     private android.webkit.ValueCallback<Uri[]> filePickerCallback;
-    private Uri selectedVideo;
+    private volatile Uri selectedVideo;
     private String pendingText;
     private List<VideoHighlightsExporter.Range> pendingRanges;
     private File pendingAudio;
@@ -213,6 +214,22 @@ public final class MainActivity extends Activity {
     }
 
     private final class NativeBridge {
+        /** Android asset is bundled in the APK; demo never uses the network. */
+        @JavascriptInterface public String useDemo() {
+            try {
+                File demo = new File(getCacheDir(), "kp_movie_recap_demo.mp4");
+                if (!demo.isFile() || demo.length() < 1000) {
+                    try (InputStream in = getAssets().open("demo.mp4");
+                         OutputStream out = new FileOutputStream(demo)) {
+                        byte[] chunk = new byte[65536];
+                        int read;
+                        while ((read = in.read(chunk)) != -1) out.write(chunk, 0, read);
+                    }
+                }
+                selectedVideo = Uri.fromFile(demo);
+                return demo.length() > 1000 ? "OK" : "Demo file missing";
+            } catch (Exception e) { return "Demo မဖွင့်နိုင်ပါ: " + e.getMessage(); }
+        }
         @JavascriptInterface public void speak(String text, String tag) {
             runOnUiThread(() -> {
                 if (text == null || text.trim().isEmpty()) return;
