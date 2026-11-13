@@ -37,7 +37,7 @@ for(let i=0;i<clips.length;i++){
 }
 assert.ok(script.includes("lastNativeDuration || Number($('preview').duration)"),'Native duration not used');
 assert.ok(script.includes('scanVideoNative')&&script.includes('exportHighlightsAuto'),'One-click bridge missing');
-assert.equal((activity.match(/void\\s+scanVideoNative\\s*\\(/g)||[]).length,1,'Duplicate or missing scanner bridge');
+assert.equal(activity.split('void scanVideoNative(').length-1,1,'Duplicate or missing scanner bridge');
 assert.ok(activity.includes('NativeSceneScanner.sample'),'Native scan not wired');
 assert.ok(scanner.includes('MediaMetadataRetriever'),'Native frame reader missing');
 assert.ok(activity.includes('Environment.DIRECTORY_MOVIES'),'Automatic file save missing');
