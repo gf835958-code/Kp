@@ -42,13 +42,13 @@ public final class OfflineSubtitleRenderer {
     }
 
     private static final class CaptionCanvas extends CanvasOverlay {
-        private final List<String> captions;
+        private final List<CaptionTimeline.Cue> cues;
         private final Paint background = new Paint(Paint.ANTI_ALIAS_FLAG);
         private final TextPaint foreground = new TextPaint(Paint.ANTI_ALIAS_FLAG);
 
-        CaptionCanvas(List<String> lines) {
+        CaptionCanvas(List<CaptionTimeline.Cue> entries) {
             super(true);
-            captions = Collections.unmodifiableList(new ArrayList<>(lines));
+            cues = Collections.unmodifiableList(new ArrayList<>(entries));
             background.setColor(Color.argb(208, 11, 12, 29));
             foreground.setColor(Color.WHITE);
             foreground.setTypeface(Typeface.create("sans-serif", Typeface.BOLD));
@@ -56,10 +56,17 @@ public final class OfflineSubtitleRenderer {
         }
 
         @Override public void onDraw(Canvas canvas, long presentationTimeUs) {
-            int index = (int)(presentationTimeUs / 5000000L);
-            if (index < 0 || index >= captions.size()) return;
-            String content = captions.get(index);
-            if (content == null || content.trim().isEmpty()) return;
+            CaptionTimeline.Cue active = null;
+            int lo = 0, hi = cues.size() - 1;
+            while (lo <= hi) {
+                int mid = (lo + hi) >>> 1;
+                CaptionTimeline.Cue entry = cues.get(mid);
+                if (presentationTimeUs < entry.startUs) hi = mid - 1;
+                else if (presentationTimeUs >= entry.endUs) lo = mid + 1;
+                else { active = entry; break; }
+            }
+            if (active == null || active.text.trim().isEmpty()) return;
+            String content = active.text;
 
             int width = canvas.getWidth(), height = canvas.getHeight();
             if (width <= 0 || height <= 0) return;
@@ -91,12 +98,12 @@ public final class OfflineSubtitleRenderer {
      * Caller keeps the Transformer reference for lifecycle cancellation.
      */
     public static Transformer start(Context context, Uri videoUri,
-                                    List<String> captions, File destination,
+                                    List<CaptionTimeline.Cue> cues, File destination,
                                     ResultListener listener) {
-        if (videoUri == null || destination == null || captions == null ||
-                captions.isEmpty()) throw new IllegalArgumentException("Need video and captions");
+        if (videoUri == null || destination == null || cues == null ||
+                cues.isEmpty()) throw new IllegalArgumentException("Need video and caption timeline");
         List<Effect> videoEffects = Collections.<Effect>singletonList(
-            new OverlayEffect(Collections.singletonList(new CaptionCanvas(captions))));
+            new OverlayEffect(Collections.singletonList(new CaptionCanvas(cues))));
         Effects effects = new Effects(Collections.emptyList(), videoEffects);
         EditedMediaItem item = new EditedMediaItem.Builder(MediaItem.fromUri(videoUri))
                 .setEffects(effects)
