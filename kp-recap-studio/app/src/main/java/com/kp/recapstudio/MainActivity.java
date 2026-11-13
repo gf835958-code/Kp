@@ -514,10 +514,9 @@ public class MainActivity extends Activity implements TextToSpeech.OnInitListene
         book = recap;
         saveDrafts();
         status("Step 1/4 — Offline TTS WAV from prepared script");
+        // On a fully cached job beginWav() may start the merge asynchronously
+        // and set exporting=false immediately. Do not mistake that for failure.
         beginWav();
-        if (!exporting && completedWav == null && quickExportRunning) {
-            quickExportFailed("Offline TTS could not start. Check device voice.");
-        }
     }
 
     private void restoreQuickBook() {
@@ -1004,7 +1003,8 @@ public class MainActivity extends Activity implements TextToSpeech.OnInitListene
             nextWav();
         } catch (Exception e) {
             exporting = false;
-            status("WAV initialization failed: " + e.getMessage());
+            if (quickExportRunning) quickExportFailed("WAV initialization failed: " + e.getMessage());
+            else status("WAV initialization failed: " + e.getMessage());
         }
     }
 
@@ -1047,7 +1047,7 @@ public class MainActivity extends Activity implements TextToSpeech.OnInitListene
                 completedWav = f;
                 post("Long WAV generated; preparing output…");
                 ui.post(() -> {
-                    if (isFinishing() || isDestroyed()) return;
+                    if (isFinishing() || isDestroyed() || cancelled) return;
                     if (quickExportRunning) {
                         continueQuickRecap(f);
                     } else {
@@ -1345,6 +1345,9 @@ public class MainActivity extends Activity implements TextToSpeech.OnInitListene
     private void post(String s) { ui.post(() -> status(s)); }
     @Override protected void onPause() { saveDrafts(); super.onPause(); }
     @Override protected void onDestroy() {
+        quickExportRunning = false;
+        quickOutputUri = null;
+        restoreQuickBook();
         if (subtitleTransformer != null) {
             try { subtitleTransformer.cancel(); } catch (Exception ignored) {}
             subtitleTransformer = null;
