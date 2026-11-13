@@ -22,22 +22,33 @@ jobs:
         with:
           distribution: temurin
           java-version: '17'
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.10.2'
-      - name: Install Android platform and build tools
+      - name: Install Android SDK dependencies
+        run: sdkmanager 'platforms;android-35' 'build-tools;35.0.0'
+      - name: Generate bundled offline test video
         run: |
-          SDKMGR=$(find "$ANDROID_HOME/cmdline-tools" -type f -name sdkmanager -print -quit)
-          test -n "$SDKMGR"
-          "$SDKMGR" --version
-          yes | "$SDKMGR" --licenses > /dev/null || true
-          "$SDKMGR" 'platforms;android-35' 'build-tools;35.0.0'
+          mkdir -p app/src/main/assets
+          ffmpeg -hide_banner -loglevel error -y \
+            -f lavfi -i 'color=c=0x1E293B:s=320x180:r=12:d=3' \
+            -f lavfi -i 'color=c=0x0F766E:s=320x180:r=12:d=3' \
+            -f lavfi -i 'color=c=0x6D28D9:s=320x180:r=12:d=3' \
+            -f lavfi -i 'color=c=0xA16207:s=320x180:r=12:d=3' \
+            -f lavfi -i 'color=c=0x9F1239:s=320x180:r=12:d=3' \
+            -f lavfi -i 'sine=frequency=440:sample_rate=44100:duration=15' \
+            -filter_complex '[0:v][1:v][2:v][3:v][4:v]concat=n=5:v=1:a=0,format=yuv420p[v]' \
+            -map '[v]' -map 5:a -c:v libx264 -preset ultrafast -crf 32 -c:a aac \
+            -movflags +faststart -shortest app/src/main/assets/demo.mp4
+          test -s app/src/main/assets/demo.mp4
       - name: Build Android debug APK
         run: gradle --no-daemon --stacktrace :app:assembleDebug
-      - name: Upload APK
+      - name: Upload APK (not source archive)
         uses: actions/upload-artifact@v4
         with:
-          name: KP-Movie-Recap-v0.2-APK
+          name: KP-Movie-Recap-v0.3-APK
           path: app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
