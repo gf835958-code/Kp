@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <uses-permission android:name="android.permission.RECORD_AUDIO"/>
-    <application android:label="KP Recap Studio" android:theme="@android:style/Theme.Material.NoActionBar"
+    <application android:label="KP Recap Studio" android:icon="@drawable/kp_logo" android:roundIcon="@drawable/kp_logo" android:theme="@android:style/Theme.Material.NoActionBar"
         android:allowBackup="false" android:usesCleartextTraffic="false" android:supportsRtl="true">
         <activity android:name=".MainActivity" android:exported="true"
             android:screenOrientation="unspecified" android:windowSoftInputMode="adjustResize">
