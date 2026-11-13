@@ -17,7 +17,7 @@ body.show-advanced #scanBtn{display:block!important}
 </head>
 <body>
 <div class="app">
-<header><div class="brand"><div class="icon">🎬</div><div><b>KP MOVIE RECAP</b><small>OFFLINE VIDEO STUDIO</small></div></div><span class="pill">◉ ANDROID MVP v0.5</span></header>
+<header><div class="brand"><div class="icon">🎬</div><div><b>KP MOVIE RECAP</b><small>OFFLINE VIDEO STUDIO</small></div></div><span class="pill">◉ ANDROID MVP v0.6</span></header>
 <section class="hero"><div class="eyebrow">✦ Android-first • Private by default</div><h1>Movie ထည့်မယ်။<br><span>Recap ကို ဖန်တီးမယ်။</span></h1><p>Video ရွေးပြီး Generate Video တစ်ချက်နှိပ်ပါ။ AI က frame များကို စစ်ပြီး Highlight MP4 ကို ဖုန်းထဲ အလိုအလျောက် သိမ်းပါမယ်။ မြန်မာအသံနဲ့ Subtitle ပေါင်းထည့်နိုင်တဲ့ Full Recap မဟုတ်သေးပါ။</p></section>
 <main class="workspace">
 <div class="stack">
@@ -33,16 +33,16 @@ body.show-advanced #scanBtn{display:block!important}
 <section class="card"><h2>🚀 Development Roadmap</h2><ul class="roadmap"><li>Video Import & Preview</li><li>Scene Frame Scan (basic)</li><li>Editable Script + SRT Download</li><li class="later">Offline AI Movie Understanding</li><li class="later">Burmese Voice Generation & Sync</li><li>Native Android Scene MP4 Highlight Export (rough-cut)</li><li class="later">Narration + subtitle burn-in / precise sync</li><li>Native Android WebView + file picker</li></ul></section>
 <div class="notice"><b>🛡️ Privacy & rights</b><div>Video ဖိုင်ကို ဒီ Prototype က Server ပေါ်မပို့ပါ။ ကိုယ်ပိုင် သို့မဟုတ် အသုံးပြုခွင့်ရှိသော Video များကိုသာ Recap အဖြစ် ထုတ်ဝေပါ။</div></div>
 </div>
-</main><div class="footer">KP Movie Recap Studio • Android MVP v0.5 • No cloud upload</div></div>
+</main><div class="footer">KP Movie Recap Studio • Android MVP v0.6 • No cloud upload</div></div>
 <div id="toast" role="status"></div>
 <script>
-const $=id=>document.getElementById(id);let currentFile=null,objectUrl=null,shotList=[],busy=false,demoMode=false;let labelWaiters=new Map();
+const $=id=>document.getElementById(id);let currentFile=null,objectUrl=null,shotList=[],busy=false,demoMode=false;let labelWaiters=new Map();let lastNativeDuration=0;let nativeScanResolve=null;
 const fn=()=>currentFile?currentFile.name.replace(/\.[^.]+$/,''):'KP-Movie-Recap';
 function toast(msg){$('toast').textContent=msg;$('toast').style.display='block';clearTimeout(toast.t);toast.t=setTimeout(()=>$('toast').style.display='none',4000)}
 function formatTime(s){if(!Number.isFinite(s))return '00:00';let x=Math.max(0,Math.floor(s));return String(Math.floor(x/60)).padStart(2,'0')+':'+String(x%60).padStart(2,'0')}
 $('choose').onclick=e=>{e.stopPropagation();$('file').click()};$('drop').onclick=e=>{if(e.target.id==='choose')return;$('file').click()};$('drop').onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();$('file').click()}};
 $('drop').ondragover=e=>{e.preventDefault();$('drop').classList.add('drag')};$('drop').ondragleave=()=>$('drop').classList.remove('drag');$('drop').ondrop=e=>{e.preventDefault();$('drop').classList.remove('drag');if(e.dataTransfer.files.length)loadFile(e.dataTransfer.files[0])};$('file').onchange=e=>{if(e.target.files.length)loadFile(e.target.files[0])};
-function loadFile(file){if(!file.type.startsWith('video/'))return toast('Video File ကိုပဲ ရွေးပေးပါ။');demoMode=false;if(objectUrl)URL.revokeObjectURL(objectUrl);currentFile=file;objectUrl=URL.createObjectURL(file);$('preview').src=objectUrl;$('videoWrap').style.display='block';$('fileMeta').textContent=file.name+' • '+(file.size/1048576).toFixed(1)+' MB';shotList=[];renderShots();$('script').value='';toast('Video Import လုပ်ပြီးပါပြီ။ Scene Scan စမ်းနိုင်ပါတယ်။')}
+function loadFile(file){lastNativeDuration=0;if(!file.type.startsWith('video/'))return toast('Video File ကိုပဲ ရွေးပေးပါ။');demoMode=false;if(objectUrl)URL.revokeObjectURL(objectUrl);currentFile=file;objectUrl=URL.createObjectURL(file);$('preview').src=objectUrl;$('videoWrap').style.display='block';$('fileMeta').textContent=file.name+' • '+(file.size/1048576).toFixed(1)+' MB';shotList=[];renderShots();$('script').value='';toast('Video Import လုပ်ပြီးပါပြီ။ Scene Scan စမ်းနိုင်ပါတယ်။')}
 const demoBurmese = [
   'ဇာတ်လမ်းစမ်းသပ်မှုမှာ အရောင်တစ်ခုနဲ့ ပထမမြင်ကွင်း စတင်လာပါတယ်။',
   'နောက်ထပ်မြင်ကွင်းမှာ အရောင်ပြောင်းလဲပြီး ဇာတ်ကြောင်းတစ်ခု ဆက်သွားပါတယ်။',
@@ -60,9 +60,47 @@ const demoEnglish = [
 function setProgress(n,msg){$('progress').style.display='block';$('progBar').style.width=n+'%';$('progTxt').textContent=msg+' • '+Math.round(n)+'%'}
 function waitEvent(el,event,timeout=15000){return new Promise((resolve,reject)=>{let done=false;let t=setTimeout(()=>{cleanup();reject(Error('Video frame timeout'))},timeout);let handler=()=>{cleanup();resolve()};function cleanup(){if(done)return;done=true;clearTimeout(t);el.removeEventListener(event,handler)}el.addEventListener(event,handler,{once:true})})}
 function seek(v,t){return new Promise((resolve,reject)=>{if(Math.abs(v.currentTime-t)<.045&&v.readyState>=2){resolve();return}let done=false;let timer=setTimeout(()=>{if(!done){done=true;v.removeEventListener('seeked',ok);reject(Error('Seek timeout'))}},12000);function ok(){if(!done){done=true;clearTimeout(timer);resolve()}}v.addEventListener('seeked',ok,{once:true});try{v.currentTime=t}catch(e){clearTimeout(timer);reject(e)}})}
+window.onNativeScanResult=(payload,error)=>{
+  if(nativeScanResolve){const cb=nativeScanResolve;nativeScanResolve=null;cb(payload,error||'');}
+};
+function scanNativeFrames(){
+  return new Promise((resolve,reject)=>{
+    const timer=setTimeout(()=>{nativeScanResolve=null;reject(Error('Native video scan exceeded 120 seconds'))},120000);
+    nativeScanResolve=(result,error)=>{clearTimeout(timer);if(error)reject(Error(error));else resolve(result);};
+    try{AndroidRecap.scanVideoNative(Number($('maxScenes').value)||10);}
+    catch(e){clearTimeout(timer);nativeScanResolve=null;reject(e);}
+  });
+}
+function chooseNativeScenes(frames,duration,limit){
+  if(!Array.isArray(frames)||!frames.length)throw Error('No native frames returned');
+  const sorted=frames.filter(f=>Number.isFinite(f.time)).sort((a,b)=>a.time-b.time);
+  if(!sorted.length)throw Error('No valid frames');
+  const picks=[sorted[0]],candidates=sorted.slice(1).sort((a,b)=>b.diff-a.diff);
+  const minGap=Math.max(1.3,duration/(limit*2.5));
+  for(const f of candidates){
+    if(picks.length>=limit)break;
+    if(picks.every(p=>Math.abs(p.time-f.time)>=minGap))picks.push(f);
+  }
+  return picks.sort((a,b)=>a.time-b.time);
+}
 function vector(ctx){const d=ctx.getImageData(0,0,24,14).data,out=[];for(let i=0;i<d.length;i+=4){out.push(d[i]*.299+d[i+1]*.587+d[i+2]*.114)}return out}
 function distance(a,b){if(!a||!b)return 1;let s=0;for(let i=0;i<a.length;i++)s+=Math.abs(a[i]-b[i]);return s/(a.length*255)}
-$('scanBtn').onclick=async()=>{if(busy)return;if(!currentFile){toast('Video File အရင်ရွေးပါ။');return}busy=true;$('scanBtn').disabled=true;$('scanBtn').textContent='Scanning video frames…';shotList=[];renderShots();let v=document.createElement('video');v.src=objectUrl;v.muted=true;v.preload='auto';v.playsInline=true;try{if(v.readyState<1)await waitEvent(v,'loadedmetadata');if(!Number.isFinite(v.duration)||v.duration<=0)throw Error('Video duration is unavailable');let dur=v.duration,num=Math.min(44,Math.max(8,Math.ceil(dur/12)));let w=176,h=99,c=document.createElement('canvas');c.width=w;c.height=h;let ctx=c.getContext('2d',{willReadFrequently:true});let small=document.createElement('canvas');small.width=24;small.height=14;let sctx=small.getContext('2d',{willReadFrequently:true});let frames=[],last=null;for(let i=0;i<num;i++){let t=Math.min(dur-.08,(i+.3)*dur/num);await seek(v,t);ctx.drawImage(v,0,0,w,h);sctx.drawImage(v,0,0,24,14);let vec=vector(sctx),diff=distance(vec,last);last=vec;frames.push({time:t,thumb:c.toDataURL('image/jpeg',.55),diff});setProgress(8+88*(i+1)/num,'Examining frames');await new Promise(r=>setTimeout(r,0))}let limit=Number($('maxScenes').value);let picks=[frames[0]],candidates=frames.slice(1).sort((a,b)=>b.diff-a.diff);let minGap=Math.max(1.3,dur/(limit*2.5));for(let x of candidates){if(picks.length>=limit)break;if(picks.every(p=>Math.abs(p.time-x.time)>=minGap))picks.push(x)}if(demoMode){let positions=[1.5,4.5,7.5,10.5,13.5];picks=positions.map((t,i)=>({...frames.reduce((a,b)=>Math.abs(a.time-t)<Math.abs(b.time-t)?a:b),demoIndex:i}));}
+$('scanBtn').onclick=async()=>{if(busy)return;if(!currentFile){toast('Video File အရင်ရွေးပါ။');return}busy=true;$('scanBtn').disabled=true;$('scanBtn').textContent='Scanning video frames…';shotList=[];renderShots();let v=document.createElement('video');v.src=objectUrl;v.muted=true;v.preload='auto';v.playsInline=true;try{
+if(window.AndroidRecap && typeof AndroidRecap.scanVideoNative==='function' && !demoMode){
+  setProgress(12,'Android native video scan');
+  const result=await scanNativeFrames();
+  const dur=Number(result.duration);
+  if(!Number.isFinite(dur)||dur<=0)throw Error('Invalid video duration');
+  lastNativeDuration=dur;
+  const picks=chooseNativeScenes(result.frames,dur,Number($('maxScenes').value)||10);
+  shotList=picks.map(p=>({...p,labels:[],note:''}));
+  renderShots();setProgress(75,'Labeling representative images');
+  await analyzeAllFrames();
+  $('draft').click();setProgress(100,'Native scene scan complete');
+  toast(shotList.length+' frames scanned with Android native decoder.');
+  return;
+}
+if(v.readyState<1)await waitEvent(v,'loadedmetadata');if(!Number.isFinite(v.duration)||v.duration<=0)throw Error('Video duration is unavailable');let dur=v.duration,num=Math.min(44,Math.max(8,Math.ceil(dur/12)));let w=176,h=99,c=document.createElement('canvas');c.width=w;c.height=h;let ctx=c.getContext('2d',{willReadFrequently:true});let small=document.createElement('canvas');small.width=24;small.height=14;let sctx=small.getContext('2d',{willReadFrequently:true});let frames=[],last=null;for(let i=0;i<num;i++){let t=Math.min(dur-.08,(i+.3)*dur/num);await seek(v,t);ctx.drawImage(v,0,0,w,h);sctx.drawImage(v,0,0,24,14);let vec=vector(sctx),diff=distance(vec,last);last=vec;frames.push({time:t,thumb:c.toDataURL('image/jpeg',.55),diff});setProgress(8+88*(i+1)/num,'Examining frames');await new Promise(r=>setTimeout(r,0))}let limit=Number($('maxScenes').value);let picks=[frames[0]],candidates=frames.slice(1).sort((a,b)=>b.diff-a.diff);let minGap=Math.max(1.3,dur/(limit*2.5));for(let x of candidates){if(picks.length>=limit)break;if(picks.every(p=>Math.abs(p.time-x.time)>=minGap))picks.push(x)}if(demoMode){let positions=[1.5,4.5,7.5,10.5,13.5];picks=positions.map((t,i)=>({...frames.reduce((a,b)=>Math.abs(a.time-t)<Math.abs(b.time-t)?a:b),demoIndex:i}));}
 picks.sort((a,b)=>a.time-b.time);
 shotList=picks.map((p,i)=>({...p,labels:[],note:demoMode?($('lang').value==='my'?demoBurmese:demoEnglish)[p.demoIndex]:''}));renderShots();
 if(!demoMode) await analyzeAllFrames();
@@ -108,7 +146,7 @@ for(const scene of shotList.slice(0,16)){
 if(!clips.length)return toast('MP4 အတွက် Scene Range မရှိပါ။');
 AndroidRecap.exportHighlights(JSON.stringify(clips));toast('MP4 ဖိုင်သိမ်းမယ့်နေရာ ရွေးပါ။')};
 function buildAutoClips(){
-  const duration = Number($('preview').duration);
+  const duration = lastNativeDuration || Number($('preview').duration);
   if(!Number.isFinite(duration) || duration<=0) return [];
   const segmentLength = Number($('target').value) || 4;
   let clips=[], endPrev=0;
