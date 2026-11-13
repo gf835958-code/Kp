@@ -82,6 +82,6 @@ jobs:
           PY
       - uses: actions/upload-artifact@v4
         with:
-          name: KP-Recap-Studio-v0.5-DEVELOPMENT-debug-APK
+          name: KP-Recap-Studio-v0.6-DEVELOPMENT-debug-APK
           path: kp-recap-studio/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
