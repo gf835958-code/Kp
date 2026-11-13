@@ -4,6 +4,7 @@ on:
     branches: [kp-movie-recap-app]
     paths:
       - 'app/**'
+      - 'tools/**'
       - 'build.gradle'
       - 'settings.gradle'
       - 'gradle.properties'
