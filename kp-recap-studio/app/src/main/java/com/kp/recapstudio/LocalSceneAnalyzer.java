@@ -60,6 +60,8 @@ public final class LocalSceneAnalyzer {
                 Bitmap thumb = null;
                 try {
                     thumb = Bitmap.createScaledBitmap(frame, 160, 90, true);
+                    if (thumb == frame) thumb = frame.copy(Bitmap.Config.ARGB_8888, false);
+                    if (thumb == null) continue;
                     int[] signature = signature(thumb);
                     double diff = last == null ? 0 : difference(last, signature);
                     Scene entry = new Scene(time, thumb, diff);
