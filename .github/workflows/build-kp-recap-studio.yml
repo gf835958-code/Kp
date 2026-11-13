@@ -6,6 +6,11 @@ on:
     paths:
       - 'kp-recap-studio/**'
       - '.github/workflows/build-kp-recap-studio.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'kp-recap-studio/**'
+      - '.github/workflows/build-kp-recap-studio.yml'
   workflow_dispatch:
 
 permissions:
