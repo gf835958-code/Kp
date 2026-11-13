@@ -1211,7 +1211,7 @@ public class MainActivity extends Activity implements TextToSpeech.OnInitListene
         } catch (Exception e) {
             return -1L;
         } finally {
-            try { retriever.release(); } catch (RuntimeException ignored) {}
+            try { retriever.release(); } catch (Exception ignored) {}
         }
     }
     private String stamp(long ms) {
