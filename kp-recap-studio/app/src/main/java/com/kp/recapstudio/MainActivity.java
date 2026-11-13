@@ -65,6 +65,7 @@ public class MainActivity extends Activity implements TextToSpeech.OnInitListene
     private Transformer subtitleTransformer;
     private Uri quickOutputUri;
     private boolean quickExportRunning = false;
+    private String quickOriginalBook = null;
     private VideoView player;
     private TextToSpeech tts;
     private boolean ttsReady = false, recording = false;
@@ -256,6 +257,19 @@ public class MainActivity extends Activity implements TextToSpeech.OnInitListene
             createDocument(SAVE_QUICK_MP4, "video/mp4", "KP-Quick-Recap.mp4");
         });
         note("1-TAP Mode မှာ Video + ထည့်ထားပြီးသား Transcript/Script လိုပါတယ်။ ဖုန်းထဲရှိ Offline TTS အသံကိုသာ သုံးပြီး မြန်မာ Clone Voice မဟုတ်ပါ။ Subtitle အချိန်က အကြမ်းဖျဉ်း ၅ စက္ကန့်စီဖြစ်ပြီး အသံနဲ့ Auto Sync မဟုတ်သေးပါ။");
+        if (quickExportRunning) {
+            addButton("■ Stop Quick Export", SURFACE, v -> {
+                quickExportRunning = false;
+                quickOutputUri = null;
+                if (subtitleTransformer != null) {
+                    try { subtitleTransformer.cancel(); } catch (Exception ignored) {}
+                    subtitleTransformer = null;
+                }
+                stopSpeech();
+                restoreQuickBook();
+                status("Quick export cancelled");
+            });
+        }
         player = new VideoView(this);
         player.setBackgroundColor(Color.BLACK);
         panel.addView(player, new LinearLayout.LayoutParams(-1, dp(200)));
@@ -496,6 +510,7 @@ public class MainActivity extends Activity implements TextToSpeech.OnInitListene
         if (recap.trim().isEmpty()) { status("A transcript or script is required"); return; }
         quickOutputUri = destination;
         quickExportRunning = true;
+        quickOriginalBook = book;
         book = recap;
         saveDrafts();
         status("Step 1/4 — Offline TTS WAV from prepared script");
@@ -505,9 +520,18 @@ public class MainActivity extends Activity implements TextToSpeech.OnInitListene
         }
     }
 
+    private void restoreQuickBook() {
+        if (quickOriginalBook != null) {
+            book = quickOriginalBook;
+            quickOriginalBook = null;
+            saveDrafts();
+        }
+    }
+
     private void quickExportFailed(String message) {
         quickExportRunning = false;
         quickOutputUri = null;
+        restoreQuickBook();
         status("Quick Export: " + message);
     }
 
@@ -541,6 +565,7 @@ public class MainActivity extends Activity implements TextToSpeech.OnInitListene
                             new OfflineSubtitleRenderer.ResultListener() {
                             @Override public void onComplete(File rendered) {
                                 subtitleTransformer = null;
+                                if (!quickExportRunning) return;
                                 quickExportRunning = false;
                                 status("Step 4/4 — Saving final MP4 locally");
                                 new Thread(() -> {
@@ -553,6 +578,7 @@ public class MainActivity extends Activity implements TextToSpeech.OnInitListene
                                         rendered.delete(); narrated.delete(); audio.delete();
                                         ui.post(() -> {
                                             quickOutputUri = null;
+                                            restoreQuickBook();
                                             if (currentTab == 1) showInterface();
                                             status("MP4 saved with TTS voice and rough-timed subtitles. Not AI voice cloned.");
                                         });
@@ -1060,7 +1086,11 @@ public class MainActivity extends Activity implements TextToSpeech.OnInitListene
         if (tts != null) tts.stop();
         status("Stopped");
     }
-    private void stopWithError(String s) { stopSpeech(); status(s); }
+    private void stopWithError(String s) {
+        stopSpeech();
+        if (quickExportRunning) quickExportFailed(s);
+        else status(s);
+    }
 
     private List<String> splitText(String source, int limit) {
         ArrayList<String> parts = new ArrayList<>();
