@@ -44,7 +44,7 @@ import java.util.*;
 
 public class MainActivity extends Activity implements TextToSpeech.OnInitListener {
     private static final int VIDEO = 101, TXT = 102, AUDIO = 103, PDF = 104;
-    private static final int SAVE_SRT = 105, SAVE_WAV = 106, MIC = 107, SAVE_MP4 = 108;
+    private static final int SAVE_SRT = 105, SAVE_WAV = 106, MIC = 107, SAVE_MP4 = 108, NARRATION = 109, SAVE_NARRATED_MP4 = 110;
     private final int BACKGROUND = Color.rgb(11, 16, 31), SURFACE = Color.rgb(24, 31, 54);
     private final int WHITE = Color.rgb(238, 239, 255), MUTED = Color.rgb(169, 180, 208);
     private final int ACCENT = Color.rgb(152, 74, 252);
@@ -55,10 +55,11 @@ public class MainActivity extends Activity implements TextToSpeech.OnInitListene
     private TextView info;
     private int currentTab = 0;
     private String transcript = "", recap = "", book = "", sampleName = "အသံနမူနာ မရွေးရသေး", pdfName = "";
-    private Uri videoUri, sampleUri, pdfUri;
+    private Uri videoUri, sampleUri, pdfUri, narrationUri, lastMontageUri;
+    private boolean lastMontageReady = false;
     private List<LocalSceneAnalyzer.Scene> videoScenes = new ArrayList<>();
     private long videoDurationMs = 0;
-    private boolean analyzingScenes = false, extractingPdf = false, exportingMontage = false;
+    private boolean analyzingScenes = false, extractingPdf = false, exportingMontage = false, exportingNarration = false;
     private VideoView player;
     private TextToSpeech tts;
     private boolean ttsReady = false, recording = false;
@@ -246,6 +247,30 @@ public class MainActivity extends Activity implements TextToSpeech.OnInitListene
             if (videoUri == null) { status("Video အရင်ရွေးပါ"); return; }
             player.start();
         });
+        addButton("🎙 AAC/M4A Narration ဖိုင် Import", SURFACE,
+            v -> pick(NARRATION, "audio/*"));
+        note("🎤 Voiceover: " + (narrationUri == null ?
+            "မရွေးရသေး (သို့မဟုတ် Audiobook tab မှ WAV Generate လုပ်ပါ)" :
+            narrationUri.getLastPathSegment()));
+        addButton("📚 Recap Script → Audiobook / WAV", PURPLE, v -> {
+            if (recap.trim().isEmpty()) { status("Recap Script အရင်ရေးပါ"); return; }
+            book = recap;
+            saveDrafts();
+            currentTab = 2; showInterface();
+            status("Recap Script ကို Audiobook နဲ့ Offline TTS အတွက် လွှဲပြီးပါပြီ");
+        });
+        addButton(exportingNarration ? "⏳ Narrated MP4 Export လုပ်နေသည်…" :
+            "⬇ Video + Narration → MP4", TEAL, v -> {
+            if (exportingNarration) { status("MP4 export in progress"); return; }
+            if (videoUri == null) { status("Video အရင် Import လုပ်ပါ"); return; }
+            if (narrationUri == null && completedWav == null) {
+                status("AAC/M4A narration ကို Import လုပ်ပါ၊ သို့မဟုတ် Audiobook မှ WAV Generate လုပ်ပါ");
+                return;
+            }
+            createDocument(SAVE_NARRATED_MP4, "video/mp4", "KP-Recap-Narrated.mp4");
+        });
+        note("Narrated MP4 မှာ နောက်ဆုံးအောင်မြင်ထားတဲ့ Scene Montage (သို့မဟုတ် မူရင်း Video) နဲ့ သီးခြား AAC/M4A အသံ (သို့မဟုတ် App မှ ထုတ်ထားတဲ့ WAV) ကို ပေါင်းပေးတယ်။ ဒီစနစ်က AI Clone Voice မဟုတ်ပါ။");
+
         addButton(analyzingScenes ? "🔍 Visual Scene Finder လုပ်ဆောင်နေသည်…" :
             "🔍 Offline Visual Scene Finder", PURPLE, v -> findVideoScenes());
         if (!videoScenes.isEmpty()) {
@@ -406,6 +431,7 @@ public class MainActivity extends Activity implements TextToSpeech.OnInitListene
                     chosen, duration, this::post);
                 ui.post(() -> {
                     exportingMontage = false;
+                    if (source.equals(videoUri)) lastMontageReady = true;
                     if (currentTab == 1) showInterface();
                     status("Silent MP4 video saved (" + frames + " encoded samples). No narration.");
                 });
@@ -416,6 +442,51 @@ public class MainActivity extends Activity implements TextToSpeech.OnInitListene
                 });
             }
         }, "KP-MP4-Export").start();
+    }
+
+    private void exportWithNarration(Uri output) {
+        if (exportingNarration) {
+            status("Narration export is already running");
+            return;
+        }
+        if (videoUri == null) {
+            status("Video import လိုပါတယ်");
+            return;
+        }
+        if (completedWav == null && narrationUri == null) {
+            status("AAC/M4A narration or a generated Audiobook WAV is required");
+            return;
+        }
+        exportingNarration = true;
+        final Uri source = lastMontageReady && lastMontageUri != null
+                ? lastMontageUri : videoUri;
+        final Uri chosenNarration = narrationUri;
+        final File generatedWav = completedWav;
+        status("Preparing fully offline MP4 with narration…");
+        new Thread(() -> {
+            try {
+                Uri audio;
+                if (generatedWav != null) {
+                    post("Encoding generated TTS WAV into offline AAC");
+                    File temp = new File(getCacheDir(), "kp-recap-narration.m4a");
+                    OfflineWavToAac.convert(generatedWav, temp);
+                    audio = Uri.fromFile(temp);
+                } else {
+                    audio = chosenNarration;
+                }
+                OfflineNarratedMuxer.export(this, source, audio, output, this::post);
+                ui.post(() -> {
+                    exportingNarration = false;
+                    if (currentTab == 1) showInterface();
+                    status("Video + AAC narration MP4 saved. Subtitle burn-in not available yet.");
+                });
+            } catch (Exception e) {
+                ui.post(() -> {
+                    exportingNarration = false;
+                    status("Narration MP4 error: " + e.getMessage());
+                });
+            }
+        }, "KP-Narration-MP4").start();
     }
 
     private void clearVideoScenes() {
@@ -535,11 +606,18 @@ public class MainActivity extends Activity implements TextToSpeech.OnInitListene
             if (req == VIDEO) {
                 videoUri = uri;
                 clearVideoScenes();
+                lastMontageReady = false;
+                lastMontageUri = null;
                 currentTab = 1; showInterface();
                 status("Video Imported (Local Preview)");
             } else if (req == TXT) {
                 book = readText(uri); saveDrafts(); currentTab = 2; showInterface();
                 status("TXT Import အောင်မြင်");
+            } else if (req == NARRATION) {
+                narrationUri = uri;
+                currentTab = 1;
+                showInterface();
+                status("Narration file selected. AAC/M4A input is required.");
             } else if (req == AUDIO) {
                 sampleUri = uri; sampleName = "Sample: " + uri.getLastPathSegment();
                 currentTab = 3; showInterface(); status("Sample audio ready — cloning is not installed");
@@ -553,7 +631,11 @@ public class MainActivity extends Activity implements TextToSpeech.OnInitListene
                 currentTab = 4; showInterface();
                 status("Offline PDF open");
             } else if (req == SAVE_MP4) {
+                lastMontageReady = false;
+                lastMontageUri = uri;
                 exportSceneVideo(uri);
+            } else if (req == SAVE_NARRATED_MP4) {
+                exportWithNarration(uri);
             } else if (req == SAVE_SRT) {
                 try (OutputStream out = getContentResolver().openOutputStream(uri)) {
                     if (out == null) throw new IOException("Output denied");
