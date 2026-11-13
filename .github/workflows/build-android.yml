@@ -33,6 +33,8 @@ jobs:
           "$SDKMGR" --version
           yes | "$SDKMGR" --licenses > /dev/null || true
           "$SDKMGR" 'platforms;android-35' 'build-tools;35.0.0'
+      - name: Verify native one-click pipeline (30-minute simulation)
+        run: node tools/verify-oneclick.cjs
       - name: Build Android debug APK
         run: gradle --no-daemon --stacktrace :app:assembleDebug
       - name: Upload APK
