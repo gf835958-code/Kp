@@ -34,6 +34,9 @@ import android.widget.TextView;
 import android.widget.VideoView;
 import android.widget.Toast;
 import java.io.*;
+import com.tom_roush.pdfbox.android.PDFBoxResourceLoader;
+import com.tom_roush.pdfbox.pdmodel.PDDocument;
+import com.tom_roush.pdfbox.text.PDFTextStripper;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
 
@@ -50,7 +53,10 @@ public class MainActivity extends Activity implements TextToSpeech.OnInitListene
     private TextView info;
     private int currentTab = 0;
     private String transcript = "", recap = "", book = "", sampleName = "အသံနမူနာ မရွေးရသေး", pdfName = "";
-    private Uri videoUri, sampleUri;
+    private Uri videoUri, sampleUri, pdfUri;
+    private List<LocalSceneAnalyzer.Scene> videoScenes = new ArrayList<>();
+    private long videoDurationMs = 0;
+    private boolean analyzingScenes = false, extractingPdf = false;
     private VideoView player;
     private TextToSpeech tts;
     private boolean ttsReady = false, recording = false;
@@ -238,6 +244,55 @@ public class MainActivity extends Activity implements TextToSpeech.OnInitListene
             if (videoUri == null) { status("Video အရင်ရွေးပါ"); return; }
             player.start();
         });
+        addButton(analyzingScenes ? "🔍 Visual Scene Finder လုပ်ဆောင်နေသည်…" :
+            "🔍 Offline Visual Scene Finder", PURPLE, v -> findVideoScenes());
+        if (!videoScenes.isEmpty()) {
+            label("🎞 Visual scene hints (" + videoScenes.size() + ")");
+            note("ဖုန်းထဲမှာ Video Frame တွေကိုသာ နှိုင်းယှဉ်ထားတာပါ။ ဇာတ်လမ်းကို နားလည်တဲ့ AI သို့မဟုတ် အသံကနေ စာပြောင်းခြင်း မဟုတ်ပါ။");
+            for (int i = 0; i < videoScenes.size(); i++) {
+                final LocalSceneAnalyzer.Scene scene = videoScenes.get(i);
+                final int index = i + 1;
+                LinearLayout row = new LinearLayout(this);
+                row.setGravity(Gravity.CENTER_VERTICAL);
+                row.setPadding(dp(9), dp(5), dp(9), dp(5));
+                GradientDrawable rowBg = new GradientDrawable();
+                rowBg.setCornerRadius(dp(14)); rowBg.setColor(SURFACE);
+                row.setBackground(rowBg);
+                ImageView thumb = new ImageView(this);
+                thumb.setImageBitmap(scene.thumbnail);
+                thumb.setScaleType(ImageView.ScaleType.CENTER_CROP);
+                row.addView(thumb, new LinearLayout.LayoutParams(dp(110), dp(72)));
+                TextView cue = new TextView(this);
+                cue.setText("Scene " + String.format(Locale.US,"%02d", index) +
+                    "\\n" + sceneStamp(scene.timeMs) + "  •  Tap to seek");
+                cue.setTextColor(WHITE);
+                cue.setTextSize(14);
+                cue.setPadding(dp(12), 0, dp(3), 0);
+                row.addView(cue, new LinearLayout.LayoutParams(0, dp(66), 1));
+                LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-1, dp(82));
+                lp.setMargins(0, dp(3), 0, dp(3));
+                panel.addView(row, lp);
+                row.setOnClickListener(v -> {
+                    if (player != null && videoUri != null) {
+                        player.seekTo((int)Math.min(scene.timeMs, Integer.MAX_VALUE));
+                        status("Seek to " + sceneStamp(scene.timeMs));
+                    }
+                });
+            }
+            addButton("📝 Scene Timestamp Notes → Transcript", TEAL, v -> {
+                StringBuilder guide = new StringBuilder();
+                for (int j = 0; j < videoScenes.size(); j++) {
+                    LocalSceneAnalyzer.Scene scene = videoScenes.get(j);
+                    guide.append("Scene ").append(j + 1).append(" [")
+                        .append(sceneStamp(scene.timeMs))
+                        .append("] — [ဒီအခန်းကို ကြည့်ပြီး ဇာတ်ညွှန်းရေးရန်]").append("\\n");
+                }
+                transcript = guide.toString();
+                saveDrafts();
+                showInterface();
+                status("Scene note template ready; you can edit the transcript.");
+            });
+        }
         label("Transcript / ဇာတ်ညွှန်းစာသား");
         EditText e = textBox(transcript, 9);
         e.addTextChangedListener(watch(value -> transcript = value));
@@ -302,6 +357,9 @@ public class MainActivity extends Activity implements TextToSpeech.OnInitListene
         title("📄 Offline PDF Reader");
         note("PDF စာအုပ်ကို ဖုန်းထဲမှာ Internet မလိုဘဲ Page အလိုက် ကြည့်နိုင်ပါတယ်။ PDF Text Extraction / OCR / Auto Voice Reading မပါသေးပါ။");
         addButton("📂 PDF ဖိုင်ရွေးရန်", TEAL, v -> pick(PDF, "application/pdf"));
+        addButton(extractingPdf ? "⏳ PDF Text ထုတ်ယူနေသည်…" :
+           "📚 PDF Text → Audiobook", PURPLE, v -> extractPdfTextToBook());
+        note("Text-based PDF မှ စာသားကို အပြည့်ယူမယ်။ Scan လုပ်ထားတဲ့ ပုံ PDF အတွက် OCR မပါသေးပါ။");
         label(pdfName.isEmpty() ? "PDF မရွေးရသေး" : pdfName);
         pdfPageLabel = new TextView(this);
         pdfPageLabel.setTextColor(MUTED);
@@ -314,6 +372,101 @@ public class MainActivity extends Activity implements TextToSpeech.OnInitListene
         addButton("← Previous Page", SURFACE, v -> { pdfPage--; drawPdf(); });
         addButton("Next Page →", SURFACE, v -> { pdfPage++; drawPdf(); });
         drawPdf();
+    }
+
+    private void clearVideoScenes() {
+        for (LocalSceneAnalyzer.Scene s : videoScenes) {
+            if (!s.thumbnail.isRecycled()) s.thumbnail.recycle();
+        }
+        videoScenes = new ArrayList<>();
+        videoDurationMs = 0;
+    }
+
+    private String sceneStamp(long ms) {
+        return String.format(Locale.US, "%02d:%02d:%02d", ms / 3600000,
+            (ms / 60000) % 60, (ms / 1000) % 60);
+    }
+
+    private void findVideoScenes() {
+        if (videoUri == null) { status("Video အရင်ရွေးပါ"); return; }
+        if (analyzingScenes) { status("Scene detection already running"); return; }
+        analyzingScenes = true;
+        final Uri target = videoUri;
+        status("Video ကို Offline Visual Scene အဖြစ် စစ်ဆေးနေပါတယ်…");
+        new Thread(() -> {
+            try {
+                final LocalSceneAnalyzer.Result found = LocalSceneAnalyzer.analyze(this, target);
+                ui.post(() -> {
+                    analyzingScenes = false;
+                    if (isFinishing() || isDestroyed() || !target.equals(videoUri)) {
+                        for (LocalSceneAnalyzer.Scene x : found.scenes) x.thumbnail.recycle();
+                        return;
+                    }
+                    clearVideoScenes();
+                    videoDurationMs = found.durationMs;
+                    videoScenes = found.scenes;
+                    if (currentTab == 1) showInterface();
+                    status(found.scenes.size() + " visual cues found • " + found.warning);
+                });
+            } catch (Exception e) {
+                ui.post(() -> {
+                    analyzingScenes = false;
+                    status("Video scene analysis failed: " + e.getMessage());
+                });
+            }
+        }, "KP-SceneAnalysis").start();
+    }
+
+    private void extractPdfTextToBook() {
+        if (pdfUri == null) { status("PDF အရင် Import လုပ်ပါ"); return; }
+        if (extractingPdf) { status("PDF extraction already running"); return; }
+        extractingPdf = true;
+        final Uri uri = pdfUri;
+        status("PDF စာသားကို Offline ထုတ်ယူနေပါတယ်…");
+        new Thread(() -> {
+            try {
+                PDFBoxResourceLoader.init(getApplicationContext());
+                StringBuilder text = new StringBuilder();
+                int pages;
+                try (InputStream stream = getContentResolver().openInputStream(uri)) {
+                    if (stream == null) throw new IOException("Cannot open PDF");
+                    try (PDDocument doc = PDDocument.load(stream)) {
+                        pages = doc.getNumberOfPages();
+                        if (pages > 1500) throw new IOException("Over 1500 pages; split this PDF by book chapters");
+                        PDFTextStripper stripper = new PDFTextStripper();
+                        stripper.setSortByPosition(true);
+                        for (int page = 1; page <= pages; page += 12) {
+                            stripper.setStartPage(page);
+                            stripper.setEndPage(Math.min(pages, page + 11));
+                            text.append(stripper.getText(doc));
+                            if (text.length() > 2500000)
+                                throw new IOException("Extracted text exceeds 2.5 million characters");
+                        }
+                    }
+                }
+                final String extracted = text.toString().trim();
+                if (extracted.isEmpty()) {
+                    throw new IOException("No selectable PDF text. Scanned pages need OCR.");
+                }
+                ui.post(() -> {
+                    extractingPdf = false;
+                    if (isFinishing() || isDestroyed()) return;
+                    book = extracted; saveDrafts(); currentTab = 2; showInterface();
+                    status("PDF " + pages + " pages → Audiobook text ready (" +
+                        extracted.length() + " chars)");
+                });
+            } catch (Exception e) {
+                ui.post(() -> {
+                    extractingPdf = false;
+                    status("PDF Text: " + e.getMessage());
+                });
+            } catch (OutOfMemoryError oom) {
+                ui.post(() -> {
+                    extractingPdf = false;
+                    status("PDF too large for memory; divide into shorter PDF parts");
+                });
+            }
+        }, "KP-PDF-Extract").start();
     }
 
     private void pick(int request, String type) {
@@ -336,7 +489,9 @@ public class MainActivity extends Activity implements TextToSpeech.OnInitListene
         Uri uri = data.getData();
         try {
             if (req == VIDEO) {
-                videoUri = uri; currentTab = 1; showInterface();
+                videoUri = uri;
+                clearVideoScenes();
+                currentTab = 1; showInterface();
                 status("Video Imported (Local Preview)");
             } else if (req == TXT) {
                 book = readText(uri); saveDrafts(); currentTab = 2; showInterface();
@@ -346,6 +501,7 @@ public class MainActivity extends Activity implements TextToSpeech.OnInitListene
                 currentTab = 3; showInterface(); status("Sample audio ready — cloning is not installed");
             } else if (req == PDF) {
                 closePdf();
+                pdfUri = uri;
                 pdfFd = getContentResolver().openFileDescriptor(uri, "r");
                 if (pdfFd == null) throw new IOException("PDF not readable");
                 pdf = new PdfRenderer(pdfFd);
@@ -765,6 +921,7 @@ public class MainActivity extends Activity implements TextToSpeech.OnInitListene
     @Override protected void onPause() { saveDrafts(); super.onPause(); }
     @Override protected void onDestroy() {
         stopSpeech();
+        clearVideoScenes();
         closePdf();
         if (recording) stopRecord();
         if (samplePlayer!=null) samplePlayer.release();
