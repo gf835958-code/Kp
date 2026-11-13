@@ -296,6 +296,15 @@ public final class MainActivity extends Activity {
         return ranges;
     }
 
+    private void reportNativeScan(JSONObject payload, String error) {
+        runOnUiThread(() -> {
+            if (webView == null) return;
+            String json = payload == null ? "null" : payload.toString();
+            webView.evaluateJavascript("window.onNativeScanResult(" + json + "," +
+                JSONObject.quote(error == null ? "" : error) + ")", null);
+        });
+    }
+
     private int configureTts(String tag) {
         if (!ttsReady || tts == null) { feedback("ဖုန်းမှာ TTS Engine မရသေးပါ။"); return TextToSpeech.ERROR; }
         int status = tts.setLanguage(Locale.forLanguageTag(tag));
@@ -338,6 +347,19 @@ public final class MainActivity extends Activity {
                 reportImageLabels(index, new JSONArray(), e.getMessage());
             }
         }
+        /** Off-main-thread native video scan; avoids WebView seek timeouts on long MP4s. */
+        @JavascriptInterface public void scanVideoNative(int sceneCount) {
+            Uri source = selectedVideo;
+            if (source == null) { reportNativeScan(null, "No video selected"); return; }
+            if (sceneCount < 1 || sceneCount > 16) { reportNativeScan(null, "Invalid scene count"); return; }
+            io.execute(() -> {
+                try { reportNativeScan(NativeSceneScanner.sample(MainActivity.this, source, sceneCount), ""); }
+                catch (Exception e) {
+                    reportNativeScan(null, e.getClass().getSimpleName() + ": " + e.getMessage());
+                }
+            });
+        }
+
         @JavascriptInterface public void speak(String text, String tag) {
             runOnUiThread(() -> {
                 if (text == null || text.trim().isEmpty()) return;
