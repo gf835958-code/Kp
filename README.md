@@ -1,3 +1,14 @@
+# KP Movie Recap Studio v0.4 — Auto Visual Summary Test Build
+
+**Important:** This is an offline image-labeling prototype, not full movie understanding and not a bundled Burmese TTS system. It is designed to eliminate manual scene-note entry while validating the on-device AI vision bridge.
+
+- Import a video, press Scan Scenes; the app selects representative frames, runs *bundled* ML Kit image labeling on each frame, and writes a coarse *visual observation script* and SRT automatically.
+- On-device image labels detect objects only. They cannot infer actors, dialogue, causality, movie plot, or reliably generate a complete recap.
+- Scene highlight MP4 is still a rough-cut of original media; no narration/subtitles are embedded.
+- Burmese device TTS still requires a compatible speech engine. A tested bundled Burmese model (e.g. MMS-TTS-mya ONNX) is not included yet; DO NOT promise working Burmese voice in this build.
+- No video upload or API key required. `com.google.mlkit:image-labeling:17.0.9` bundles a lightweight image model.
+- Next full-auto milestone: integrate a tested local visual-language model (not just labels), a separate on-device Myanmar speech model and audio/video mux with subtitles. Validate on real vivo V27 before calling this a finished app.
+
 # KP Movie Recap Studio v0.3 — Android App
 
 Standalone source for a **free, offline-first** Android 8.0+ APK (tested build target: Android 15). Purple/cyan WebView UI and native Android processing bridges.

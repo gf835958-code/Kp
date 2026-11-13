@@ -2,6 +2,9 @@ package com.kp.movierecap;
 
 import android.annotation.SuppressLint;
 import android.app.Activity;
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
+import android.util.Base64;
 import android.content.Intent;
 import android.content.res.Configuration;
 import android.net.Uri;
@@ -17,6 +20,12 @@ import android.webkit.WebResourceResponse;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
+
+import com.google.mlkit.vision.common.InputImage;
+import com.google.mlkit.vision.label.ImageLabeling;
+import com.google.mlkit.vision.label.ImageLabeler;
+import com.google.mlkit.vision.label.defaults.ImageLabelerOptions;
+import com.google.mlkit.vision.label.ImageLabel;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
@@ -49,6 +58,7 @@ public final class MainActivity extends Activity {
     private String pendingText;
     private List<VideoHighlightsExporter.Range> pendingRanges;
     private File pendingAudio;
+    private final ImageLabeler imageLabeler = ImageLabeling.getClient(ImageLabelerOptions.DEFAULT_OPTIONS);
     private TextToSpeech tts;
     private volatile boolean ttsReady = false;
     private volatile boolean exporting = false;
@@ -206,6 +216,13 @@ public final class MainActivity extends Activity {
         }
     }
 
+    private void reportImageLabels(int index, JSONArray labels, String error) {
+        runOnUiThread(() -> {
+            if (webView != null) webView.evaluateJavascript(
+                "window.onFrameLabels(" + index + "," + labels.toString() + "," + JSONObject.quote(error == null ? "" : error) + ")", null);
+        });
+    }
+
     private int configureTts(String tag) {
         if (!ttsReady || tts == null) { feedback("ဖုန်းမှာ TTS Engine မရသေးပါ။"); return TextToSpeech.ERROR; }
         int status = tts.setLanguage(Locale.forLanguageTag(tag));
@@ -214,21 +231,39 @@ public final class MainActivity extends Activity {
     }
 
     private final class NativeBridge {
-        /** Android asset is bundled in the APK; demo never uses the network. */
-        @JavascriptInterface public String useDemo() {
+        /** Offline ML Kit image labels describe visible objects, NOT plot or character intent. */
+        @JavascriptInterface public void labelFrame(int index, String dataUrl) {
+            if (index < 0 || index > 30 || dataUrl == null || dataUrl.length() > 300000) {
+                reportImageLabels(index, new JSONArray(), "invalid frame"); return;
+            }
             try {
-                File demo = new File(getCacheDir(), "kp_movie_recap_demo.mp4");
-                if (!demo.isFile() || demo.length() < 1000) {
-                    try (InputStream in = getAssets().open("demo.mp4");
-                         OutputStream out = new FileOutputStream(demo)) {
-                        byte[] chunk = new byte[65536];
-                        int read;
-                        while ((read = in.read(chunk)) != -1) out.write(chunk, 0, read);
-                    }
-                }
-                selectedVideo = Uri.fromFile(demo);
-                return demo.length() > 1000 ? "OK" : "Demo file missing";
-            } catch (Exception e) { return "Demo မဖွင့်နိုင်ပါ: " + e.getMessage(); }
+                int delimiter = dataUrl.indexOf(',');
+                if (delimiter < 0 || !dataUrl.startsWith("data:image/")) throw new IllegalArgumentException("bad image");
+                byte[] bytes = Base64.decode(dataUrl.substring(delimiter+1), Base64.DEFAULT);
+                Bitmap bmp = BitmapFactory.decodeByteArray(bytes, 0, bytes.length);
+                if (bmp == null) throw new IllegalArgumentException("image decode failed");
+                imageLabeler.process(InputImage.fromBitmap(bmp, 0))
+                    .addOnSuccessListener(labels -> {
+                        JSONArray array = new JSONArray();
+                        for (ImageLabel label : labels) {
+                            if (label.getConfidence() < .45f) continue;
+                            JSONObject item = new JSONObject();
+                            try {
+                                item.put("label", label.getText());
+                                item.put("confidence", label.getConfidence());
+                                array.put(item);
+                            } catch (Exception ignored) { }
+                        }
+                        reportImageLabels(index, array, "");
+                        bmp.recycle();
+                    })
+                    .addOnFailureListener(e -> {
+                        reportImageLabels(index, new JSONArray(), e.getMessage());
+                        bmp.recycle();
+                    });
+            } catch (Exception e) {
+                reportImageLabels(index, new JSONArray(), e.getMessage());
+            }
         }
         @JavascriptInterface public void speak(String text, String tag) {
             runOnUiThread(() -> {
@@ -311,6 +346,7 @@ public final class MainActivity extends Activity {
     @Override public void onDestroy() {
         if (filePickerCallback != null) filePickerCallback.onReceiveValue(null);
         if (tts != null) { tts.stop(); tts.shutdown(); }
+        imageLabeler.close();
         if (webView != null) { webView.removeJavascriptInterface("AndroidRecap"); webView.destroy(); }
         io.shutdownNow();
         super.onDestroy();
