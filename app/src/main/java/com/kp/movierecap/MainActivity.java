@@ -6,6 +6,10 @@ import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.util.Base64;
 import android.content.Intent;
+import android.content.ContentValues;
+import android.provider.MediaStore;
+import android.os.Environment;
+import android.os.Build;
 import android.content.res.Configuration;
 import android.net.Uri;
 import android.os.Bundle;
@@ -223,6 +227,75 @@ public final class MainActivity extends Activity {
         });
     }
 
+    /** Save the one-tap rough cut to Movies/KP Movie Recap without asking for a second tap. */
+    private void exportToMovies(List<VideoHighlightsExporter.Range> ranges) {
+        if (Build.VERSION.SDK_INT < 29) {
+            pendingRanges = ranges;
+            startSaveDialog("KP-Scene-Highlights.mp4", "video/mp4", REQ_MP4);
+            return;
+        }
+        final Uri input = selectedVideo;
+        if (input == null) {
+            exporting = false;
+            autoExportFeedback(false, "Video ကို အရင်ရွေးပါ။");
+            return;
+        }
+        io.execute(() -> {
+            Uri output = null;
+            boolean completed = false;
+            try {
+                ContentValues values = new ContentValues();
+                final String filename = "KP-Highlights-" + System.currentTimeMillis() + ".mp4";
+                values.put(MediaStore.Video.Media.DISPLAY_NAME, filename);
+                values.put(MediaStore.Video.Media.MIME_TYPE, "video/mp4");
+                values.put(MediaStore.Video.Media.RELATIVE_PATH,
+                    Environment.DIRECTORY_MOVIES + "/KP Movie Recap");
+                values.put(MediaStore.Video.Media.IS_PENDING, 1);
+                output = getContentResolver().insert(MediaStore.Video.Media.EXTERNAL_CONTENT_URI, values);
+                if (output == null) throw new IllegalStateException("Cannot create movie file");
+                try (ParcelFileDescriptor out = getContentResolver().openFileDescriptor(output, "w")) {
+                    if (out == null) throw new IllegalStateException("Cannot open movie file");
+                    VideoHighlightsExporter.export(this, input, out.getFileDescriptor(), ranges);
+                }
+                ContentValues published = new ContentValues();
+                published.put(MediaStore.Video.Media.IS_PENDING, 0);
+                getContentResolver().update(output, published, null, null);
+                completed = true;
+                autoExportFeedback(true, "MP4 ကို Movies/KP Movie Recap/ ထဲ အလိုအလျောက် သိမ်းပြီးပါပြီ။");
+            } catch (Exception e) {
+                if (output != null) {
+                    try { getContentResolver().delete(output, null, null); } catch (Exception ignored) { }
+                }
+                autoExportFeedback(false, "MP4 Export မအောင်မြင်ပါ: " + e.getMessage());
+            } finally {
+                exporting = false;
+            }
+        });
+    }
+
+    private void autoExportFeedback(boolean success, String message) {
+        runOnUiThread(() -> {
+            if (webView != null) webView.evaluateJavascript(
+                "window.onAutoExportResult(" + success + "," + JSONObject.quote(message) + ")", null);
+        });
+    }
+
+    private List<VideoHighlightsExporter.Range> parseRanges(String rangesJson) throws Exception {
+        JSONArray arr = new JSONArray(rangesJson);
+        if (arr.length() == 0 || arr.length() > 16) throw new IllegalArgumentException("Invalid scene count");
+        List<VideoHighlightsExporter.Range> ranges = new ArrayList<>();
+        for (int i = 0; i < arr.length(); i++) {
+            JSONArray item = arr.getJSONArray(i);
+            double start = item.getDouble(0), end = item.getDouble(1);
+            if (!Double.isFinite(start) || !Double.isFinite(end) || start < 0 || end <= start || end - start > 15) {
+                throw new IllegalArgumentException("Invalid clip time");
+            }
+            ranges.add(new VideoHighlightsExporter.Range((long)(start * 1_000_000), (long)(end * 1_000_000)));
+        }
+        ranges.sort(Comparator.comparingLong(r -> r.startUs));
+        return ranges;
+    }
+
     private int configureTts(String tag) {
         if (!ttsReady || tts == null) { feedback("ဖုန်းမှာ TTS Engine မရသေးပါ။"); return TextToSpeech.ERROR; }
         int status = tts.setLanguage(Locale.forLanguageTag(tag));
@@ -315,23 +388,26 @@ public final class MainActivity extends Activity {
                 if (result != TextToSpeech.SUCCESS) feedback("TTS အသံထုတ်လို့ မရပါ။");
             });
         }
+        @JavascriptInterface public void exportHighlightsAuto(String rangesJson) {
+            runOnUiThread(() -> {
+                if (selectedVideo == null) { autoExportFeedback(false, "Video ကို အရင်ရွေးပါ။"); return; }
+                if (exporting) { autoExportFeedback(false, "MP4 Export တစ်ခု လုပ်နေဆဲဖြစ်ပါတယ်။"); return; }
+                try {
+                    List<VideoHighlightsExporter.Range> ranges = parseRanges(rangesJson);
+                    exporting = true;
+                    exportToMovies(ranges);
+                } catch (Exception e) {
+                    exporting = false;
+                    autoExportFeedback(false, "Scene MP4 Settings မမှန်ပါ။");
+                }
+            });
+        }
         @JavascriptInterface public void exportHighlights(String rangesJson) {
             runOnUiThread(() -> {
                 if (selectedVideo == null) { feedback("Video ဖိုင်ကို အရင်ရွေးပါ။"); return; }
                 if (exporting) { feedback("MP4 Export တစ်ခု လုပ်နေဆဲဖြစ်ပါတယ်။"); return; }
                 try {
-                    JSONArray arr = new JSONArray(rangesJson);
-                    if (arr.length() == 0 || arr.length() > 16) throw new IllegalArgumentException("Invalid scene count");
-                    List<VideoHighlightsExporter.Range> ranges = new ArrayList<>();
-                    for (int i = 0; i < arr.length(); i++) {
-                        JSONArray item = arr.getJSONArray(i);
-                        double start = item.getDouble(0), end = item.getDouble(1);
-                        if (!Double.isFinite(start) || !Double.isFinite(end) || start < 0 || end <= start || end - start > 15) {
-                            throw new IllegalArgumentException("Invalid clip time");
-                        }
-                        ranges.add(new VideoHighlightsExporter.Range((long)(start * 1_000_000), (long)(end * 1_000_000)));
-                    }
-                    ranges.sort(Comparator.comparingLong(r -> r.startUs));
+                    List<VideoHighlightsExporter.Range> ranges = parseRanges(rangesJson);
                     pendingRanges = ranges;
                     exporting = true;
                     startSaveDialog("KP-Scene-Highlights.mp4", "video/mp4", REQ_MP4);
