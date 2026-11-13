@@ -13,6 +13,7 @@ import android.graphics.drawable.GradientDrawable;
 import android.graphics.drawable.Drawable;
 import android.graphics.pdf.PdfRenderer;
 import android.media.MediaPlayer;
+import android.media.MediaMetadataRetriever;
 import android.media.MediaRecorder;
 import android.net.Uri;
 import android.os.Build;
@@ -256,7 +257,7 @@ public class MainActivity extends Activity implements TextToSpeech.OnInitListene
             if (!assureOfflineVoice()) return;
             createDocument(SAVE_QUICK_MP4, "video/mp4", "KP-Quick-Recap.mp4");
         });
-        note("1-TAP Mode မှာ Video + ထည့်ထားပြီးသား Transcript/Script လိုပါတယ်။ ဖုန်းထဲရှိ Offline TTS အသံကိုသာ သုံးပြီး မြန်မာ Clone Voice မဟုတ်ပါ။ Subtitle အချိန်က အကြမ်းဖျဉ်း ၅ စက္ကန့်စီဖြစ်ပြီး အသံနဲ့ Auto Sync မဟုတ်သေးပါ။");
+        note("1-TAP Mode မှာ Video + ထည့်ထားပြီးသား Transcript/Script လိုပါတယ်။ ဖုန်းထဲရှိ Offline TTS အသံကိုသာ သုံးပြီး မြန်မာ Clone Voice မဟုတ်ပါ။ Subtitle အချိန်ကို အသံဖိုင်အရှည်အပေါ်မူတည်ပြီး ခန့်မှန်းခွဲထားတာဖြစ်ကာ စကားလုံးအလိုက် Auto Sync မဟုတ်သေးပါ။");
         if (quickExportRunning) {
             addButton("■ Stop Quick Export", SURFACE, v -> {
                 quickExportRunning = false;
@@ -311,7 +312,7 @@ public class MainActivity extends Activity implements TextToSpeech.OnInitListene
         if (exportingSubtitleVideo) {
             addButton("■ Stop Subtitle Export", SURFACE, v -> cancelSubtitleExport());
         }
-        note("Caption MP4: script ကို အပိုင်းလိုက် ခန့်မှန်း ၅ စက္ကန့်စီ Overlay ထည့်တယ်။ Video/Audio အမှန်နဲ့ Auto Sync မဟုတ်သေးပါ။ Rendering က ဖုန်း Codec ပေါ်မူတည်ပြီး ကြာနိုင်ပါတယ်။");
+        note("Caption MP4: script ကို အပိုင်းလိုက် Video အရှည်နဲ့ အချိုးကျ ခန့်မှန်းအချိန်နဲ့ Overlay ထည့်တယ်။ Video/Audio အမှန်နဲ့ Auto Sync မဟုတ်သေးပါ။ Rendering က ဖုန်း Codec ပေါ်မူတည်ပြီး ကြာနိုင်ပါတယ်။");
 
         addButton(analyzingScenes ? "🔍 Visual Scene Finder လုပ်ဆောင်နေသည်…" :
             "🔍 Offline Visual Scene Finder", PURPLE, v -> findVideoScenes());
@@ -538,8 +539,8 @@ public class MainActivity extends Activity implements TextToSpeech.OnInitListene
         if (!quickExportRunning || quickOutputUri == null) return;
         final Uri output = quickOutputUri;
         final Uri selectedVideo = videoUri;
-        final List<String> subtitles = splitText(recap, 95);
-        if (subtitles.isEmpty()) {
+        final String scriptForVideo = recap;
+        if (CaptionTimeline.split(scriptForVideo, 95).isEmpty()) {
             quickExportFailed("Script has no subtitle text");
             return;
         }
@@ -553,6 +554,13 @@ public class MainActivity extends Activity implements TextToSpeech.OnInitListene
                 if (narrated.exists() && !narrated.delete()) throw new IOException("Cannot overwrite temp MP4");
                 OfflineNarratedMuxer.export(this, selectedVideo,
                     Uri.fromFile(audio), Uri.fromFile(narrated), this::post);
+                long audioLengthUs = mediaDurationUs(Uri.fromFile(audio));
+                long videoLengthUs = mediaDurationUs(Uri.fromFile(narrated));
+                long timedLengthUs = (audioLengthUs > 0 && videoLengthUs > 0) ?
+                    Math.min(audioLengthUs, videoLengthUs) :
+                    (audioLengthUs > 0 ? audioLengthUs : videoLengthUs);
+                final List<CaptionTimeline.Cue> subtitles =
+                    CaptionTimeline.plan(scriptForVideo, timedLengthUs, 95);
                 ui.post(() -> {
                     if (!quickExportRunning || isFinishing() || isDestroyed()) return;
                     status("Step 3/4 — Burn subtitles into MP4 frames");
@@ -654,10 +662,11 @@ public class MainActivity extends Activity implements TextToSpeech.OnInitListene
             status("Video နဲ့ Recap Script လိုပါတယ်");
             return;
         }
-        List<String> captions = splitText(recap, 95);
-        if (captions.isEmpty()) { status("No captions available"); return; }
         final Uri source = lastNarratedReady && lastNarratedUri != null ? lastNarratedUri :
                 lastMontageReady && lastMontageUri != null ? lastMontageUri : videoUri;
+        List<CaptionTimeline.Cue> captions =
+            CaptionTimeline.plan(recap, mediaDurationUs(source), 95);
+        if (captions.isEmpty()) { status("No captions available"); return; }
         final File cacheOutput = new File(getCacheDir(), "kp-subtitle-render.mp4");
         if (cacheOutput.exists() && !cacheOutput.delete()) {
             status("Cannot clear old subtitle temp output");
@@ -1116,15 +1125,31 @@ public class MainActivity extends Activity implements TextToSpeech.OnInitListene
     }
 
     private String makeSrt(String text) {
-        List<String> items = splitText(text, 95);
-        StringBuilder b = new StringBuilder();
-        for (int i = 0; i < items.size(); i++) {
-            long start = i * 5000L;
-            b.append(i + 1).append("\n")
-                .append(stamp(start)).append(" --> ").append(stamp(start + 4500L)).append("\n")
-                .append(items.get(i)).append("\n\n");
+        Uri source = lastNarratedReady && lastNarratedUri != null
+            ? lastNarratedUri : lastMontageReady && lastMontageUri != null
+            ? lastMontageUri : videoUri;
+        long duration = mediaDurationUs(source);
+        if (duration < 0 && completedWav != null)
+            duration = mediaDurationUs(Uri.fromFile(completedWav));
+        return CaptionTimeline.toSrt(CaptionTimeline.plan(text, duration, 95));
+    }
+
+    private long mediaDurationUs(Uri uri) {
+        if (uri == null) return -1L;
+        MediaMetadataRetriever retriever = new MediaMetadataRetriever();
+        try {
+            if ("file".equals(uri.getScheme())) retriever.setDataSource(uri.getPath());
+            else retriever.setDataSource(this, uri);
+            String value = retriever.extractMetadata(
+                MediaMetadataRetriever.METADATA_KEY_DURATION);
+            if (value == null) return -1L;
+            long millis = Long.parseLong(value);
+            return millis <= 0 ? -1L : millis * 1000L;
+        } catch (Exception e) {
+            return -1L;
+        } finally {
+            try { retriever.release(); } catch (RuntimeException ignored) {}
         }
-        return b.toString();
     }
     private String stamp(long ms) {
         return String.format(Locale.US, "%02d:%02d:%02d,%03d",
