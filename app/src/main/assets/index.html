@@ -136,7 +136,7 @@ $('speak').onclick=()=>{let s=$('script').value.trim();if(!s){toast('Script အ�
 $('stop').onclick=()=>{if(window.AndroidRecap)AndroidRecap.stopSpeech();if('speechSynthesis'in window)speechSynthesis.cancel()};
 function download(name,data,type){if(window.AndroidRecap){AndroidRecap.saveText(name,data);toast('ဖိုင်သိမ်းဖို့ Folder ရွေးပါ။');return}let blob=new Blob([data],{type});let u=URL.createObjectURL(blob);let a=document.createElement('a');a.href=u;a.download=name;document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(u),5000)}
 $('txt').onclick=()=>{let t=$('script').value.trim();if(!t)return toast('Script အရင်ရေးပါ။');download(fn()+'-recap.txt',t,'text/plain;charset=utf-8');toast('Script TXT ကို Export လုပ်ပြီးပါပြီ။')};
-$('mp4').onclick=()=>{if(!currentFile||!shotList.length)return toast('Movie ထည့်ပြီး Scene Scan အရင်လုပ်ပါ။');if(!window.AndroidRecap)return toast('MP4 Export ကို Android APK မှာသာ သုံးနိုင်ပါတယ်။');let d=$('preview').duration;if(!Number.isFinite(d)||d<=0)return toast('Video duration မရပါ။');let duration=Number($('target').value)||4;
+$('mp4').onclick=()=>{if(!currentFile||!shotList.length)return toast('Movie ထည့်ပြီး Scene Scan အရင်လုပ်ပါ။');if(!window.AndroidRecap)return toast('MP4 Export ကို Android APK မှာသာ သုံးနိုင်ပါတယ်။');let d=lastNativeDuration || Number($('preview').duration);if(!Number.isFinite(d)||d<=0)return toast('Video duration မရပါ။');let duration=Number($('target').value)||4;
 let ends=0,clips=[];
 for(const scene of shotList.slice(0,16)){
   let start=Math.max(ends,Math.max(0,scene.time-.65));
