@@ -46,7 +46,7 @@ import java.util.*;
 
 public class MainActivity extends Activity implements TextToSpeech.OnInitListener {
     private static final int VIDEO = 101, TXT = 102, AUDIO = 103, PDF = 104;
-    private static final int SAVE_SRT = 105, SAVE_WAV = 106, MIC = 107, SAVE_MP4 = 108, NARRATION = 109, SAVE_NARRATED_MP4 = 110, SAVE_SUBTITLE_MP4 = 111;
+    private static final int SAVE_SRT = 105, SAVE_WAV = 106, MIC = 107, SAVE_MP4 = 108, NARRATION = 109, SAVE_NARRATED_MP4 = 110, SAVE_SUBTITLE_MP4 = 111, SAVE_QUICK_MP4 = 112;
     private final int BACKGROUND = Color.rgb(11, 16, 31), SURFACE = Color.rgb(24, 31, 54);
     private final int WHITE = Color.rgb(238, 239, 255), MUTED = Color.rgb(169, 180, 208);
     private final int ACCENT = Color.rgb(152, 74, 252);
@@ -63,6 +63,8 @@ public class MainActivity extends Activity implements TextToSpeech.OnInitListene
     private long videoDurationMs = 0;
     private boolean analyzingScenes = false, extractingPdf = false, exportingMontage = false, exportingNarration = false, exportingSubtitleVideo = false;
     private Transformer subtitleTransformer;
+    private Uri quickOutputUri;
+    private boolean quickExportRunning = false;
     private VideoView player;
     private TextToSpeech tts;
     private boolean ttsReady = false, recording = false;
@@ -242,6 +244,18 @@ public class MainActivity extends Activity implements TextToSpeech.OnInitListene
         title("🎬 Movie Recap");
         note("ကိုယ်ပိုင် Video ကို ဖုန်းထဲကနေ ဖွင့်ကြည့်ပြီး Transcript ထည့်နိုင်ပါတယ်။ Video ကို AI နဲ့ အလိုအလျောက် နားလည်ခြင်း မပါသေးပါ။");
         addButton("📂 Video ဖိုင်ရွေးရန်", TEAL, v -> pick(VIDEO, "video/*"));
+        addButton(quickExportRunning ? "⏳ Offline Recap Export လုပ်နေသည်…" :
+            "✦ 1-TAP: Video + Script → Voiceover + Subtitles MP4", PURPLE, v -> {
+            if (quickExportRunning) { status("Quick export already in progress"); return; }
+            if (videoUri == null) { status("Video ဖိုင်ထည့်ပါ"); return; }
+            if (recap.trim().isEmpty() && transcript.trim().isEmpty()) {
+                status("ဇာတ်ညွှန်းစာသား / Transcript ထည့်ပါ။ Video ကို AI နဲ့ အလိုအလျောက် နားမလည်နိုင်သေးပါ။");
+                return;
+            }
+            if (!assureOfflineVoice()) return;
+            createDocument(SAVE_QUICK_MP4, "video/mp4", "KP-Quick-Recap.mp4");
+        });
+        note("1-TAP Mode မှာ Video + ထည့်ထားပြီးသား Transcript/Script လိုပါတယ်။ ဖုန်းထဲရှိ Offline TTS အသံကိုသာ သုံးပြီး မြန်မာ Clone Voice မဟုတ်ပါ။ Subtitle အချိန်က အကြမ်းဖျဉ်း ၅ စက္ကန့်စီဖြစ်ပြီး အသံနဲ့ Auto Sync မဟုတ်သေးပါ။");
         player = new VideoView(this);
         player.setBackgroundColor(Color.BLACK);
         panel.addView(player, new LinearLayout.LayoutParams(-1, dp(200)));
@@ -456,6 +470,110 @@ public class MainActivity extends Activity implements TextToSpeech.OnInitListene
                 });
             }
         }, "KP-MP4-Export").start();
+    }
+
+    /**
+     * A connected, local-only export path from a video and USER-PROVIDED text:
+     * on-device TTS -> PCM WAV -> AAC -> MP4 mux -> caption render -> SAF output.
+     *
+     * This is not an automatic movie understanding/voice-cloning feature.
+     */
+    private void startQuickRecap(Uri destination) {
+        if (quickExportRunning) { status("Quick export already active"); return; }
+        if (videoUri == null) { status("Choose a video first"); return; }
+        if (!assureOfflineVoice()) return;
+        if (recap.trim().isEmpty()) {
+            StringBuilder result = new StringBuilder();
+            for (String part : transcript.split("[။.!?\\n]+")) {
+                if (!part.trim().isEmpty()) {
+                    if (result.length() > 0) result.append("။\\n");
+                    result.append(part.trim());
+                    if (result.length() > 2200) break;
+                }
+            }
+            recap = result.toString().trim();
+        }
+        if (recap.trim().isEmpty()) { status("A transcript or script is required"); return; }
+        quickOutputUri = destination;
+        quickExportRunning = true;
+        book = recap;
+        saveDrafts();
+        status("Step 1/4 — Offline TTS WAV from prepared script");
+        beginWav();
+        if (!exporting && completedWav == null && quickExportRunning) {
+            quickExportFailed("Offline TTS could not start. Check device voice.");
+        }
+    }
+
+    private void quickExportFailed(String message) {
+        quickExportRunning = false;
+        quickOutputUri = null;
+        status("Quick Export: " + message);
+    }
+
+    private void continueQuickRecap(File generated) {
+        if (!quickExportRunning || quickOutputUri == null) return;
+        final Uri output = quickOutputUri;
+        final Uri selectedVideo = videoUri;
+        final List<String> subtitles = splitText(recap, 95);
+        if (subtitles.isEmpty()) {
+            quickExportFailed("Script has no subtitle text");
+            return;
+        }
+        status("Step 2/4 — WAV → AAC and MP4 voiceover");
+        new Thread(() -> {
+            try {
+                File audio = new File(getCacheDir(), "kp-quick-narration.m4a");
+                if (audio.exists() && !audio.delete()) throw new IOException("Cannot overwrite temp audio");
+                OfflineWavToAac.convert(generated, audio);
+                File narrated = new File(getCacheDir(), "kp-quick-narrated.mp4");
+                if (narrated.exists() && !narrated.delete()) throw new IOException("Cannot overwrite temp MP4");
+                OfflineNarratedMuxer.export(this, selectedVideo,
+                    Uri.fromFile(audio), Uri.fromFile(narrated), this::post);
+                ui.post(() -> {
+                    if (!quickExportRunning || isFinishing() || isDestroyed()) return;
+                    status("Step 3/4 — Burn subtitles into MP4 frames");
+                    try {
+                        final File composed = new File(getCacheDir(), "kp-quick-final.mp4");
+                        if (composed.exists() && !composed.delete()) throw new IOException("Cannot clear old MP4");
+                        subtitleTransformer = OfflineSubtitleRenderer.start(this,
+                            Uri.fromFile(narrated), subtitles, composed,
+                            new OfflineSubtitleRenderer.ResultListener() {
+                            @Override public void onComplete(File rendered) {
+                                subtitleTransformer = null;
+                                quickExportRunning = false;
+                                status("Step 4/4 — Saving final MP4 locally");
+                                new Thread(() -> {
+                                    try (InputStream in = new FileInputStream(rendered);
+                                         OutputStream out = getContentResolver().openOutputStream(output)) {
+                                        if (out == null) throw new IOException("Storage access denied");
+                                        byte[] buf = new byte[65536];
+                                        int n;
+                                        while ((n = in.read(buf)) != -1) out.write(buf, 0, n);
+                                        rendered.delete(); narrated.delete(); audio.delete();
+                                        ui.post(() -> {
+                                            quickOutputUri = null;
+                                            if (currentTab == 1) showInterface();
+                                            status("MP4 saved with TTS voice and rough-timed subtitles. Not AI voice cloned.");
+                                        });
+                                    } catch (Exception ex) {
+                                        ui.post(() -> quickExportFailed(ex.getMessage()));
+                                    }
+                                }, "KP-Quick-Save").start();
+                            }
+                            @Override public void onError(String message) {
+                                subtitleTransformer = null;
+                                quickExportFailed(message);
+                            }
+                        });
+                    } catch (Exception ex) {
+                        quickExportFailed("Subtitle render start: " + ex.getMessage());
+                    }
+                });
+            } catch (Exception ex) {
+                ui.post(() -> quickExportFailed("Voiceover MP4: " + ex.getMessage()));
+            }
+        }, "KP-Quick-Recap").start();
     }
 
     private void exportWithNarration(Uri output) {
@@ -724,6 +842,8 @@ public class MainActivity extends Activity implements TextToSpeech.OnInitListene
                 exportWithNarration(uri);
             } else if (req == SAVE_SUBTITLE_MP4) {
                 burnSubtitleMp4(uri);
+            } else if (req == SAVE_QUICK_MP4) {
+                startQuickRecap(uri);
             } else if (req == SAVE_SRT) {
                 try (OutputStream out = getContentResolver().openOutputStream(uri)) {
                     if (out == null) throw new IOException("Output denied");
@@ -899,10 +1019,14 @@ public class MainActivity extends Activity implements TextToSpeech.OnInitListene
                 File f = new File(getCacheDir(), "kp-recap-audiobook.wav");
                 mergeWavs(files, f);
                 completedWav = f;
-                post("Long WAV ready; choose folder to save");
+                post("Long WAV generated; preparing output…");
                 ui.post(() -> {
-                    if (!isFinishing() && !isDestroyed())
+                    if (isFinishing() || isDestroyed()) return;
+                    if (quickExportRunning) {
+                        continueQuickRecap(f);
+                    } else {
                         createDocument(SAVE_WAV, "audio/wav", "KP-Audiobook.wav");
+                    }
                 });
             } catch (Exception e) { post("Audio merge error: " + e.getMessage()); }
         }, "KP-WAV-Merge").start();
