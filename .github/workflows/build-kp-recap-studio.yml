@@ -60,6 +60,26 @@ jobs:
       - name: Compile native experimental Android debug APK
         working-directory: kp-recap-studio
         run: gradle --no-daemon --stacktrace testDebugUnitTest assembleDebug
+      - name: Verify native Android APK includes the complete offline speech engine
+        working-directory: kp-recap-studio
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import hashlib, zipfile
+          apk = 'app/build/outputs/apk/debug/app-debug.apk'
+          with zipfile.ZipFile(apk) as z:
+              model = 'assets/models/ggml-tiny.bin'
+              native = 'lib/arm64-v8a/libwhisper.so'
+              for name in (model, native, 'AndroidManifest.xml'):
+                  assert name in z.namelist(), f'Missing required APK entry: {name}'
+              h = hashlib.sha256()
+              with z.open(model) as src:
+                  for part in iter(lambda: src.read(1024 * 1024), b''):
+                      h.update(part)
+              expected = 'be07e048e1e599ad46341c8d2a135645097a538221678b7acdd1b1919c6e1b21'
+              assert h.hexdigest() == expected, 'Packaged Whisper Tiny SHA256 mismatch'
+              print('Verified: native Android APK bundles intact Whisper Tiny + ARM64 native engine')
+          PY
       - uses: actions/upload-artifact@v4
         with:
           name: KP-Recap-Studio-v0.5-DEVELOPMENT-debug-APK
