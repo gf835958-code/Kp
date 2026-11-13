@@ -1,39 +1,47 @@
-# KP Recap Studio — Native Android APK
+# KP Recap Studio — Native Android (v0.5 development branch)
 
-A native Java/Android app designed for offline-first use. **No WebView website wrapper**, no INTERNET permission, no paid API key or required cloud service.
+**Status: experimental Android APK, not a completed one-click Movie Recap / Burmese AI Voice Cloning product.**
+The user requested to receive ONLY a feature-complete APK. Do not market or link a debug build as the final deliverable.
 
-## Working code added through v0.4
+## Offline native code currently implemented
 
-- Purple-neon launcher icon, Home dashboard, local-only file input with Android Storage Access Framework.
-- **Movie Recap**: import and preview local video, offline visual shot-change **hints** sampled from video keyframes, seek to chosen frames, scene timestamp notes, editable manual transcript and **basic extractive** (not generative) script, rough-timed SRT subtitle export.
-- **Scene video output**: MP4 **silent montage** of short scenes using Android MediaExtractor + MediaMuxer (stream copy; no added captions/voice). H.264/H.265 source only, cuts are sync-frame-aligned, so timestamps are approximate. Tested by CI compile; needs device/runtime QA.
-- **Audiobook**: import TXT or paste long text, choose installed **offline** Android TTS voice (Burmese if actually present on the device), read aloud, generate sequential chunks and merge into uncompressed WAV. Saved valid chunks are reused after interruption when the same text and voice are selected. App-private cache can be cleared explicitly.
-- **PDF Reader**: on-device PDF page rendering + text extraction for selectable text PDFs using PdfBox-Android. The extracted text becomes an audiobook draft. **Scanned PDF OCR not implemented.**
-- **Voice Lab**: record mic sample or import/listen to local authorized audio samples. This is **not** an AI voice-cloning system. No voice model is included.
-- Source code builds as Android 15-compatible native APK; target API 35, minimum API 26. Tested Android platform compilation via GitHub Actions; runtime on vivo V27 not yet verified.
+- Native Java Android app, custom logo, dark purple dashboard; does not embed any website or require an Internet permission.
+- Open and preview user-authorized video on device.
+- Sample keyframes and detect rough **visual shot-change hints** using difference of scaled frames; show scene cards and seek to timestamps.
+- Create scene-note template, manually paste/edit transcript, basic extractive short-script generation (**NOT true AI video understanding**).
+- Export approximate-timing SRT captions.
+- Export short silent H.264/H.265 MP4 scene montages (sync-frame-aligned with approximate cuts).
+- Import authorized AAC/M4A narration or use the generated audiobook WAV, encode 16-bit PCM WAV to AAC using Android MediaCodec, mux audio with video into MP4 using MediaMuxer. Original audio is discarded in narration mux output; it is not mixed.
+- Burn rough-timed captions (based on 5-second script chunks) into MP4 via AndroidX Media3 Transformer, drawing native text onto decoded frames before re-encoding. If available, use the last narrated video as input, otherwise last montage or original video. **Caption timing is NOT auto-aligned to speech.**
+- Read text-based PDFs locally, extract their selectable text (PdfBox-Android), and send content to an audiobook text editor. Does not OCR scanned PDFs.
+- Import long TXT and use already-installed local/offline TTS voices where available; speak and generate chunked WAV files; resume from cached successfully generated portions after interruption using text + voice-specific cache key. Standard RIFF WAV format has a ~4GB size limit.
+- Microphone recording and import/playback of consented voice samples.
 
-## Major requested features NOT DONE
+## Explicitly missing from the user's final required app
 
-- Offline neural Burmese **voice cloning** from user-provided voice samples; needs verified permissively licensed model, Android inference engine, segmentation, quality/performance evaluation, and user consent controls.
-- Video speech transcription and AI comprehension of the movie; scene finder is visual sampling only.
-- One-click final Movie Recap with generated script, selected clone voice, edited original footage, subtitles burned in, audio/muxed MP4.
-- Robust multi-hour export with device-level battery/heat/storage stress testing. Standard WAV has ~4GB container size limit.
-- Testing/install verification on vivo V27.
+- Real **Burmese AI Voice Cloning** from a reference voice. Importing a reference audio sample is NOT voice cloning, and the Android system TTS voice is NOT a clone.
+- Offline video audio transcription (ASR) and AI semantic understanding of video scenes.
+- Automatic AI Movie Recap script generation without transcript or manual review.
+- Fully automatic one-click chain that creates and voiceovers video with correctly time-aligned subtitles, despite separate functioning building blocks.
+- Tested/benchmark validated multi-hour Burmese narration on vivo V27 hardware.
+- Android emulator and physical-device runtime QA for MediaMuxer/Media3 effects and TTS codecs.
+- Store-ready signing, model redistribution rights and release quality guarantees.
 
-**Do not present this branch as a final complete app and do not distribute its debug APK as a feature-complete voice-cloning app.**
+## Voice cloning model evaluation
+
+- Candidate: https://huggingface.co/freococo/F5-Myanmar-TTS (Burmese, F5-TTS v2, ~674MB weights, CC-BY-NC-4.0).
+- The documented Python inference is NOT an Android runtime implementation.
+- General F5-TTS → ONNX export code exists (https://github.com/DakeQQ/F5-TTS-ONNX), but its compatibility with this Burmese checkpoint, preprocessing/vocoder setup, ARM64 performance and device memory constraints have **not been verified**.
+- ZipVoice and PocketTTS Android-compatible options focus on other supported languages, not verified Burmese voice cloning.
+- Do not bundle, redistribute or claim working support for a checkpoint without checking its license and a successful Android inference test.
+- Only clone the user's own voice or a voice with the speaker's authorization.
 
 ## Build
 
-Requirements: JDK 17 and Android SDK 35.
+- JDK 17; AGP 8.10.1; Gradle 8.11.1; compile SDK 36; target API 35; minimum API 26.
+- AndroidX Media3 1.11.1; PdfBox-Android 2.0.27.0.
+- Run `gradle assembleDebug` in `kp-recap-studio/` or use GitHub Actions.
+- Debug artifact is generated on commits, intended **for testing only**, not the final user-approved release.
+- This repository's v0.5 CI has passed Java compilation and packaging, which does not prove media export works on actual vivo V27 hardware.
 
-```sh
-cd kp-recap-studio
-gradle assembleDebug
-```
-
-Or inspect GitHub Actions `Build KP Recap Studio Native Android APK` for current branch/PR. CI output is a debug build artifact, not a release.
-
-- Dependency: `com.tom-roush:pdfbox-android:2.0.27.0` (Apache License 2.0), bundled at build time for offline text extraction.
-- Video processing uses Android platform `MediaMetadataRetriever`, `MediaExtractor` and `MediaMuxer`.
-- Local TTS voices depend on what is installed on the phone; network-required voices are rejected.
-- This app neither uses nor modifies the separate KP-AI or KP-Translator repositories.
+This project is separate from `KP-AI` and `KP-Translator`.
