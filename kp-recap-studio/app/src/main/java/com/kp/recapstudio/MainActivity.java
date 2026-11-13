@@ -2,6 +2,8 @@ package com.kp.recapstudio;
 
 import android.Manifest;
 import android.app.Activity;
+import androidx.media3.common.util.UnstableApi;
+import androidx.media3.transformer.Transformer;
 import android.app.AlertDialog;
 import android.content.Intent;
 import android.content.pm.PackageManager;
@@ -44,7 +46,7 @@ import java.util.*;
 
 public class MainActivity extends Activity implements TextToSpeech.OnInitListener {
     private static final int VIDEO = 101, TXT = 102, AUDIO = 103, PDF = 104;
-    private static final int SAVE_SRT = 105, SAVE_WAV = 106, MIC = 107, SAVE_MP4 = 108, NARRATION = 109, SAVE_NARRATED_MP4 = 110;
+    private static final int SAVE_SRT = 105, SAVE_WAV = 106, MIC = 107, SAVE_MP4 = 108, NARRATION = 109, SAVE_NARRATED_MP4 = 110, SAVE_SUBTITLE_MP4 = 111;
     private final int BACKGROUND = Color.rgb(11, 16, 31), SURFACE = Color.rgb(24, 31, 54);
     private final int WHITE = Color.rgb(238, 239, 255), MUTED = Color.rgb(169, 180, 208);
     private final int ACCENT = Color.rgb(152, 74, 252);
@@ -55,11 +57,12 @@ public class MainActivity extends Activity implements TextToSpeech.OnInitListene
     private TextView info;
     private int currentTab = 0;
     private String transcript = "", recap = "", book = "", sampleName = "အသံနမူနာ မရွေးရသေး", pdfName = "";
-    private Uri videoUri, sampleUri, pdfUri, narrationUri, lastMontageUri;
-    private boolean lastMontageReady = false;
+    private Uri videoUri, sampleUri, pdfUri, narrationUri, lastMontageUri, lastNarratedUri;
+    private boolean lastMontageReady = false, lastNarratedReady = false;
     private List<LocalSceneAnalyzer.Scene> videoScenes = new ArrayList<>();
     private long videoDurationMs = 0;
-    private boolean analyzingScenes = false, extractingPdf = false, exportingMontage = false, exportingNarration = false;
+    private boolean analyzingScenes = false, extractingPdf = false, exportingMontage = false, exportingNarration = false, exportingSubtitleVideo = false;
+    private Transformer subtitleTransformer;
     private VideoView player;
     private TextToSpeech tts;
     private boolean ttsReady = false, recording = false;
@@ -270,6 +273,17 @@ public class MainActivity extends Activity implements TextToSpeech.OnInitListene
             createDocument(SAVE_NARRATED_MP4, "video/mp4", "KP-Recap-Narrated.mp4");
         });
         note("Narrated MP4 မှာ နောက်ဆုံးအောင်မြင်ထားတဲ့ Scene Montage (သို့မဟုတ် မူရင်း Video) နဲ့ သီးခြား AAC/M4A အသံ (သို့မဟုတ် App မှ ထုတ်ထားတဲ့ WAV) ကို ပေါင်းပေးတယ်။ ဒီစနစ်က AI Clone Voice မဟုတ်ပါ။");
+        addButton(exportingSubtitleVideo ? "⏳ Subtitle Video Rendering…" :
+            "⬇ Burn Burmese Subtitles → MP4", PURPLE, v -> {
+            if (exportingSubtitleVideo) { status("Subtitle processing already running"); return; }
+            if (videoUri == null) { status("Video အရင်ထည့်ပါ"); return; }
+            if (recap.trim().isEmpty()) { status("Subtitle အတွက် Recap Script လိုပါတယ်"); return; }
+            createDocument(SAVE_SUBTITLE_MP4, "video/mp4", "KP-Recap-Captioned.mp4");
+        });
+        if (exportingSubtitleVideo) {
+            addButton("■ Stop Subtitle Export", SURFACE, v -> cancelSubtitleExport());
+        }
+        note("Caption MP4: script ကို အပိုင်းလိုက် ခန့်မှန်း ၅ စက္ကန့်စီ Overlay ထည့်တယ်။ Video/Audio အမှန်နဲ့ Auto Sync မဟုတ်သေးပါ။ Rendering က ဖုန်း Codec ပေါ်မူတည်ပြီး ကြာနိုင်ပါတယ်။");
 
         addButton(analyzingScenes ? "🔍 Visual Scene Finder လုပ်ဆောင်နေသည်…" :
             "🔍 Offline Visual Scene Finder", PURPLE, v -> findVideoScenes());
@@ -477,8 +491,9 @@ public class MainActivity extends Activity implements TextToSpeech.OnInitListene
                 OfflineNarratedMuxer.export(this, source, audio, output, this::post);
                 ui.post(() -> {
                     exportingNarration = false;
+                    lastNarratedReady = true;
                     if (currentTab == 1) showInterface();
-                    status("Video + AAC narration MP4 saved. Subtitle burn-in not available yet.");
+                    status("Video + AAC narration MP4 saved. Subtitle render ကို သီးသန့် ထုတ်နိုင်ပါတယ်။");
                 });
             } catch (Exception e) {
                 ui.post(() -> {
@@ -487,6 +502,73 @@ public class MainActivity extends Activity implements TextToSpeech.OnInitListene
                 });
             }
         }, "KP-Narration-MP4").start();
+    }
+
+    @UnstableApi
+    private void burnSubtitleMp4(Uri output) {
+        if (exportingSubtitleVideo) { status("Already rendering captions"); return; }
+        if (videoUri == null || recap.trim().isEmpty()) {
+            status("Video နဲ့ Recap Script လိုပါတယ်");
+            return;
+        }
+        List<String> captions = splitText(recap, 95);
+        if (captions.isEmpty()) { status("No captions available"); return; }
+        final Uri source = lastNarratedReady && lastNarratedUri != null ? lastNarratedUri :
+                lastMontageReady && lastMontageUri != null ? lastMontageUri : videoUri;
+        final File cacheOutput = new File(getCacheDir(), "kp-subtitle-render.mp4");
+        if (cacheOutput.exists() && !cacheOutput.delete()) {
+            status("Cannot clear old subtitle temp output");
+            return;
+        }
+        exportingSubtitleVideo = true;
+        status("Offline caption video rendering…");
+        try {
+            subtitleTransformer = OfflineSubtitleRenderer.start(this, source, captions,
+                cacheOutput, new OfflineSubtitleRenderer.ResultListener() {
+                    @Override public void onComplete(File file) {
+                        subtitleTransformer = null;
+                        new Thread(() -> {
+                            try (InputStream in = new FileInputStream(file);
+                                 OutputStream out = getContentResolver().openOutputStream(output)) {
+                                if (out == null) throw new IOException("Cannot write MP4 output");
+                                byte[] buf = new byte[65536];
+                                int n;
+                                while ((n = in.read(buf)) != -1) out.write(buf, 0, n);
+                                file.delete();
+                                ui.post(() -> {
+                                    exportingSubtitleVideo = false;
+                                    if (currentTab == 1) showInterface();
+                                    status("MP4 with burnt-in captions saved. Caption timings are approximate.");
+                                });
+                            } catch (Exception e) {
+                                ui.post(() -> {
+                                    exportingSubtitleVideo = false;
+                                    status("Subtitle MP4 save error: " + e.getMessage());
+                                });
+                            }
+                        }, "KP-Subtitle-Copy").start();
+                    }
+                    @Override public void onError(String message) {
+                        subtitleTransformer = null;
+                        exportingSubtitleVideo = false;
+                        status(message);
+                    }
+                });
+        } catch (Exception e) {
+            exportingSubtitleVideo = false;
+            subtitleTransformer = null;
+            status("Subtitle render start failed: " + e.getMessage());
+        }
+    }
+
+    private void cancelSubtitleExport() {
+        if (subtitleTransformer != null) {
+            try { subtitleTransformer.cancel(); } catch (Exception ignored) {}
+            subtitleTransformer = null;
+        }
+        exportingSubtitleVideo = false;
+        if (currentTab == 1) showInterface();
+        status("Subtitle export cancelled");
     }
 
     private void clearVideoScenes() {
@@ -608,6 +690,8 @@ public class MainActivity extends Activity implements TextToSpeech.OnInitListene
                 clearVideoScenes();
                 lastMontageReady = false;
                 lastMontageUri = null;
+                lastNarratedReady = false;
+                lastNarratedUri = null;
                 currentTab = 1; showInterface();
                 status("Video Imported (Local Preview)");
             } else if (req == TXT) {
@@ -635,7 +719,11 @@ public class MainActivity extends Activity implements TextToSpeech.OnInitListene
                 lastMontageUri = uri;
                 exportSceneVideo(uri);
             } else if (req == SAVE_NARRATED_MP4) {
+                lastNarratedReady = false;
+                lastNarratedUri = uri;
                 exportWithNarration(uri);
+            } else if (req == SAVE_SUBTITLE_MP4) {
+                burnSubtitleMp4(uri);
             } else if (req == SAVE_SRT) {
                 try (OutputStream out = getContentResolver().openOutputStream(uri)) {
                     if (out == null) throw new IOException("Output denied");
@@ -1103,6 +1191,7 @@ public class MainActivity extends Activity implements TextToSpeech.OnInitListene
     private void post(String s) { ui.post(() -> status(s)); }
     @Override protected void onPause() { saveDrafts(); super.onPause(); }
     @Override protected void onDestroy() {
+        cancelSubtitleExport();
         stopSpeech();
         clearVideoScenes();
         closePdf();
