@@ -1,6 +1,7 @@
 package com.kp.movierecap;
 
 import android.content.Context;
+import android.net.Uri;
 import android.graphics.Color;
 import android.net.Uri;
 import android.text.SpannableString;
@@ -33,8 +34,8 @@ public final class CaptionedVideoExporter {
     private Transformer transformer;
     public void start(Context context, Uri input,
             List<VideoHighlightsExporter.Range> ranges, List<String> captions,
-            File output, Callback callback) {
-        if (input == null || ranges == null || captions == null || ranges.isEmpty()
+            File narration, File output, Callback callback) {
+        if (input == null || ranges == null || captions == null || narration == null || !narration.isFile() || ranges.isEmpty()
                 || ranges.size() > 16 || ranges.size() != captions.size()) {
             throw new IllegalArgumentException("Invalid captioned export input");
         }
@@ -76,8 +77,14 @@ public final class CaptionedVideoExporter {
             }
             edited.add(builder.build());
         }
-        Composition composition = new Composition.Builder(
-                EditedMediaItemSequence.withAudioAndVideoFrom(edited)).build();
+        // A separate audio-only sequence is the speech narration track.
+        // Source audio is excluded to keep speech intelligible.
+        EditedMediaItemSequence video = EditedMediaItemSequence.withVideoFrom(edited);
+        EditedMediaItem narrated = new EditedMediaItem.Builder(
+            MediaItem.fromUri(Uri.fromFile(narration))).build();
+        EditedMediaItemSequence voice = EditedMediaItemSequence.withAudioFrom(
+            Collections.singletonList(narrated));
+        Composition composition = new Composition.Builder(video, voice).build();
         transformer = new Transformer.Builder(context)
             .addListener(new Transformer.Listener() {
                 @Override public void onCompleted(Composition composition, ExportResult result) {
