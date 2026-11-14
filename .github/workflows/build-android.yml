@@ -34,6 +34,22 @@ jobs:
           "$SDKMGR" --version
           yes | "$SDKMGR" --licenses > /dev/null || true
           "$SDKMGR" 'platforms;android-36' 'build-tools;35.0.0'
+      - name: Fetch and verify noncommercial Burmese voice engine and model
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p app/libs app/src/main/assets/mya
+          curl --fail --location --retry 3 --silent --show-error \
+            https://github.com/k2-fsa/sherpa-onnx/releases/download/v2.0.1/sherpa-onnx-2.0.1.aar \
+            -o app/libs/sherpa-onnx-2.0.1.aar
+          echo 'a8d09d1d32f3eb8520482c6d3d43fae674681c5b050385967c70a3c2c9bf0ee7  app/libs/sherpa-onnx-2.0.1.aar' | sha256sum -c -
+          base=https://huggingface.co/willwade/mms-tts-multilingual-models-onnx/resolve/d0f3eabab69a178ad836f5689044998909c88ae7/mya
+          curl --fail --location --retry 3 --silent --show-error \
+            "$base/model.onnx" -o app/src/main/assets/mya/model.onnx
+          echo '9cc2be621aa70461da190cf9a050e8194a46257012ef7c421ae67d57742fb519  app/src/main/assets/mya/model.onnx' | sha256sum -c -
+          curl --fail --location --retry 3 --silent --show-error \
+            "$base/tokens.txt" -o app/src/main/assets/mya/tokens.txt
+          test -s app/src/main/assets/mya/tokens.txt
       - name: Verify native one-click pipeline (30-minute simulation)
         run: node tools/verify-oneclick.cjs
       - name: Build Android debug APK
@@ -41,6 +57,6 @@ jobs:
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: KP-Movie-Recap-v0.7-APK
+          name: KP-Movie-Recap-v0.8-EXPERIMENTAL-APK
           path: app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
