@@ -54,6 +54,9 @@ assert.ok(activity.includes('BurmeseNarration.generate('), 'Offline Burmese narr
 const voice = fs.readFileSync('app/src/main/java/com/kp/movierecap/BurmeseNarration.java','utf8');
 assert.ok(voice.includes('OfflineTts('), 'Offline voice engine missing');
 assert.ok(voice.includes('mya/model.onnx'), 'Burmese model path missing');
+assert.ok(voice.includes('samples.length > frames'), 'Missing speech clipping guard');
+assert.ok(script.includes('<option value="12" selected>12 Seconds</option>'), 'Narrated clip duration is too short');
+assert.ok(script.includes("function buildAutoCaptionPlan()"), 'Caption clip planning missing');
 
 
 console.log('PASS: JS syntax, 30min scene/clip planning, native bridge and auto-export wiring');
