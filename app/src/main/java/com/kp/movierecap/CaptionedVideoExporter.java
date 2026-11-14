@@ -8,7 +8,7 @@ import android.text.Spanned;
 import android.text.style.BackgroundColorSpan;
 import android.text.style.ForegroundColorSpan;
 import android.text.style.RelativeSizeSpan;
-import androidx.media3.common.Effects;
+import androidx.media3.transformer.Effects;
 import androidx.media3.common.MediaItem;
 import androidx.media3.effect.OverlayEffect;
 import androidx.media3.effect.StaticOverlaySettings;
