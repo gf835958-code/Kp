@@ -162,4 +162,138 @@ public final class OfflineWavToAac {
             }
         }
     }
+
+    /**
+     * Streams many cached TTS PCM-WAV chunks through ONE continuous AAC encoder.
+     * Avoids the classic 4 GB single-WAV limit and doesn't duplicate the full
+     * audiobook as a giant temporary PCM file.
+     *
+     * All chunks must have the same channels/sample rate; a source chunk
+     * failing validation is rejected instead of silently corrupting the audio.
+     */
+    public static void convertSegments(java.util.List<File> parts, File output)
+            throws IOException {
+        if (parts == null || parts.isEmpty())
+            throw new IOException("No generated TTS audio chunks available");
+        if (output == null) throw new IOException("Output M4A missing");
+        MediaCodec encoder = null;
+        MediaMuxer muxer = null;
+        RandomAccessFile current = null;
+        boolean startedMuxer = false;
+        try {
+            // Validate the whole segment list before creating or overwriting
+            // the final M4A. This also prevents mismatched cached TTS voices.
+            Wav base = null;
+            for (File part : parts) {
+                if (part == null || !part.isFile()) throw new IOException("WAV part missing");
+                try (RandomAccessFile check = new RandomAccessFile(part, "r")) {
+                    Wav header = readHeader(check);
+                    if (header.dataLength % (header.channels * 2) != 0)
+                        throw new IOException("PCM frame boundary error in " + part.getName());
+                    if (base == null) base = header;
+                    else if (header.channels != base.channels ||
+                            header.sampleRate != base.sampleRate ||
+                            header.bits != base.bits || header.format != base.format)
+                        throw new IOException("WAV chunks use incompatible formats");
+                }
+            }
+            if (base == null) throw new IOException("No WAV audio data");
+
+            MediaFormat format = MediaFormat.createAudioFormat(
+                    MediaFormat.MIMETYPE_AUDIO_AAC, base.sampleRate, base.channels);
+            format.setInteger(MediaFormat.KEY_AAC_PROFILE,
+                    MediaCodecInfo.CodecProfileLevel.AACObjectLC);
+            format.setInteger(MediaFormat.KEY_BIT_RATE,
+                    base.channels == 1 ? 96000 : 160000);
+            format.setInteger(MediaFormat.KEY_MAX_INPUT_SIZE, 8192);
+
+            encoder = MediaCodec.createEncoderByType(MediaFormat.MIMETYPE_AUDIO_AAC);
+            encoder.configure(format, null, null, MediaCodec.CONFIGURE_FLAG_ENCODE);
+            encoder.start();
+            muxer = new MediaMuxer(output.getAbsolutePath(),
+                    MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4);
+            final int frameBytes = base.channels * 2;
+            final int rate = base.sampleRate;
+            long framesFed = 0, remaining = 0;
+            int index = 0, outputTrack = -1;
+            boolean sentEOS = false, receivedEOS = false;
+            byte[] cache = new byte[8192];
+            MediaCodec.BufferInfo info = new MediaCodec.BufferInfo();
+
+            while (!receivedEOS) {
+                if (Thread.currentThread().isInterrupted())
+                    throw new IOException("Audio encoding interrupted");
+                if (!sentEOS) {
+                    int inputIndex = encoder.dequeueInputBuffer(10000L);
+                    if (inputIndex >= 0) {
+                        ByteBuffer inputBuffer = encoder.getInputBuffer(inputIndex);
+                        if (inputBuffer == null) throw new IOException("No AAC input buffer");
+                        inputBuffer.clear();
+                        int capacity = Math.min(cache.length, inputBuffer.remaining());
+                        int maxBytes = (capacity / frameBytes) * frameBytes;
+                        if (maxBytes <= 0) throw new IOException("AAC input buffer too small");
+
+                        // Open a new cached chunk only after the previous one
+                        // is exhausted. Codec timestamps are continuous across
+                        // all chunks instead of resetting to zero each time.
+                        while (remaining == 0 && index < parts.size()) {
+                            if (current != null) { current.close(); current = null; }
+                            current = new RandomAccessFile(parts.get(index++), "r");
+                            Wav next = readHeader(current);
+                            remaining = next.dataLength;
+                            current.seek(next.position);
+                        }
+                        long presentationUs = framesFed * 1000000L / rate;
+                        if (remaining == 0) {
+                            encoder.queueInputBuffer(inputIndex, 0, 0, presentationUs,
+                                    MediaCodec.BUFFER_FLAG_END_OF_STREAM);
+                            sentEOS = true;
+                        } else {
+                            int size = (int) Math.min(remaining, maxBytes);
+                            current.readFully(cache, 0, size);
+                            inputBuffer.put(cache, 0, size);
+                            encoder.queueInputBuffer(inputIndex, 0, size, presentationUs, 0);
+                            framesFed += size / frameBytes;
+                            remaining -= size;
+                        }
+                    }
+                }
+
+                int outputIndex = encoder.dequeueOutputBuffer(info, 10000L);
+                if (outputIndex == MediaCodec.INFO_OUTPUT_FORMAT_CHANGED) {
+                    if (startedMuxer) throw new IOException("AAC format changed twice");
+                    outputTrack = muxer.addTrack(encoder.getOutputFormat());
+                    muxer.start();
+                    startedMuxer = true;
+                } else if (outputIndex >= 0) {
+                    ByteBuffer data = encoder.getOutputBuffer(outputIndex);
+                    if (data == null) throw new IOException("No AAC output buffer");
+                    if ((info.flags & MediaCodec.BUFFER_FLAG_CODEC_CONFIG) != 0) {
+                        info.size = 0;
+                    }
+                    if (info.size > 0) {
+                        if (!startedMuxer) throw new IOException("Missing AAC output format");
+                        data.position(info.offset);
+                        data.limit(info.offset + info.size);
+                        muxer.writeSampleData(outputTrack, data, info);
+                    }
+                    receivedEOS = (info.flags & MediaCodec.BUFFER_FLAG_END_OF_STREAM) != 0;
+                    encoder.releaseOutputBuffer(outputIndex, false);
+                }
+            }
+            if (startedMuxer) { muxer.stop(); startedMuxer = false; }
+        } catch (RuntimeException e) {
+            throw new IOException("Streaming AAC export failed: " + e.getMessage(), e);
+        } finally {
+            if (current != null) try { current.close(); } catch (IOException ignored) {}
+            if (muxer != null) {
+                if (startedMuxer) try { muxer.stop(); } catch (Exception ignored) {}
+                try { muxer.release(); } catch (RuntimeException ignored) {}
+            }
+            if (encoder != null) {
+                try { encoder.stop(); } catch (RuntimeException ignored) {}
+                try { encoder.release(); } catch (RuntimeException ignored) {}
+            }
+        }
+    }
 }
