@@ -512,12 +512,24 @@ public class MainActivity extends Activity implements TextToSpeech.OnInitListene
      * This is not an automatic movie understanding/voice-cloning feature.
      */
     private void startQuickRecap(Uri destination) {
-        if (quickExportRunning) { status("Quick export already active"); return; }
-        if (videoUri == null) { status("Choose a video first"); return; }
-        if (!assureOfflineVoice()) return;
+        if (quickExportRunning) {
+            status("Quick export already active");
+            discardFailedQuickDocument(destination);
+            return;
+        }
+        if (videoUri == null) {
+            status("Choose a video first");
+            discardFailedQuickDocument(destination);
+            return;
+        }
+        if (!assureOfflineVoice()) {
+            discardFailedQuickDocument(destination);
+            return;
+        }
         if (recap.trim().isEmpty() && transcript.trim().isEmpty()) {
             status("Step 0/4 — Offline speech transcription from movie audio");
-            transcribeVideoAudio(() -> startQuickRecap(destination));
+            transcribeVideoAudio(() -> startQuickRecap(destination),
+                () -> discardFailedQuickDocument(destination));
             return;
         }
         if (recap.trim().isEmpty()) {
@@ -531,7 +543,11 @@ public class MainActivity extends Activity implements TextToSpeech.OnInitListene
             }
             recap = result.toString().trim();
         }
-        if (recap.trim().isEmpty()) { status("A transcript or script is required"); return; }
+        if (recap.trim().isEmpty()) {
+            status("A transcript or script is required");
+            discardFailedQuickDocument(destination);
+            return;
+        }
         quickOutputUri = destination;
         quickExportRunning = true;
         quickOriginalBook = book;
@@ -810,8 +826,20 @@ public class MainActivity extends Activity implements TextToSpeech.OnInitListene
     }
 
     private void transcribeVideoAudio(Runnable afterSuccessfulTranscript) {
-        if (videoUri == null) { status("Video အရင် Import လုပ်ပါ"); return; }
-        if (transcribingVideo) { status("Whisper ASR already working"); return; }
+        transcribeVideoAudio(afterSuccessfulTranscript, null);
+    }
+
+    private void transcribeVideoAudio(Runnable afterSuccessfulTranscript, Runnable afterFailure) {
+        if (videoUri == null) {
+            status("Video အရင် Import လုပ်ပါ");
+            if (afterFailure != null) afterFailure.run();
+            return;
+        }
+        if (transcribingVideo) {
+            status("Whisper ASR already working");
+            if (afterFailure != null) afterFailure.run();
+            return;
+        }
         final Uri source = videoUri;
         transcribingVideo = true;
         status("Step 1 — Extracting soundtrack locally, no network");
@@ -825,9 +853,13 @@ public class MainActivity extends Activity implements TextToSpeech.OnInitListene
                     @Override public void onText(String recognized) {
                         transcribingVideo = false;
                         wav.delete();
-                        if (isFinishing() || isDestroyed() || !source.equals(videoUri)) return;
+                        if (isFinishing() || isDestroyed() || !source.equals(videoUri)) {
+                            if (afterFailure != null) afterFailure.run();
+                            return;
+                        }
                         if (recognized.trim().isEmpty()) {
                             status("Offline ASR didn't detect speech. Video may be silent.");
+                            if (afterFailure != null) afterFailure.run();
                             return;
                         }
                         transcript = recognized.trim();
@@ -841,6 +873,7 @@ public class MainActivity extends Activity implements TextToSpeech.OnInitListene
                         transcribingVideo = false;
                         wav.delete();
                         status("Offline Whisper ASR: " + message);
+                        if (afterFailure != null) afterFailure.run();
                     }
                 });
             } catch (Exception e) {
@@ -848,6 +881,7 @@ public class MainActivity extends Activity implements TextToSpeech.OnInitListene
                     transcribingVideo = false;
                     wav.delete();
                     status("Video soundtrack error: " + e.getMessage());
+                    if (afterFailure != null) afterFailure.run();
                 });
             }
         }, "KP-Offline-Video-ASR").start();
