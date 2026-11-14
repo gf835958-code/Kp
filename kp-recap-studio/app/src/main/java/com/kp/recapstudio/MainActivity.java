@@ -487,6 +487,7 @@ public class MainActivity extends Activity implements TextToSpeech.OnInitListene
             try {
                 long frames = OfflineVideoMontage.write(this, source, output,
                     chosen, duration, this::post);
+                MediaExportValidator.verify(this, output, false);
                 ui.post(() -> {
                     exportingMontage = false;
                     if (source.equals(videoUri)) lastMontageReady = true;
@@ -574,6 +575,7 @@ public class MainActivity extends Activity implements TextToSpeech.OnInitListene
                 if (narrated.exists() && !narrated.delete()) throw new IOException("Cannot overwrite temp MP4");
                 OfflineNarratedMuxer.export(this, selectedVideo,
                     Uri.fromFile(audio), Uri.fromFile(narrated), this::post);
+                MediaExportValidator.verify(this, narrated, true);
                 long audioLengthUs = mediaDurationUs(Uri.fromFile(audio));
                 long videoLengthUs = mediaDurationUs(Uri.fromFile(narrated));
                 long timedLengthUs = (audioLengthUs > 0 && videoLengthUs > 0) ?
@@ -593,24 +595,37 @@ public class MainActivity extends Activity implements TextToSpeech.OnInitListene
                             @Override public void onComplete(File rendered) {
                                 subtitleTransformer = null;
                                 if (!quickExportRunning) return;
-                                quickExportRunning = false;
-                                status("Step 4/4 — Saving final MP4 locally");
+                                status("Step 4/4 — Validating then saving final MP4");
                                 new Thread(() -> {
-                                    try (InputStream in = new FileInputStream(rendered);
-                                         OutputStream out = getContentResolver().openOutputStream(output)) {
-                                        if (out == null) throw new IOException("Storage access denied");
-                                        byte[] buf = new byte[65536];
-                                        int n;
-                                        while ((n = in.read(buf)) != -1) out.write(buf, 0, n);
+                                    try {
+                                        // Verify the full video AND narration tracks before
+                                        // claiming the saved file is playable.
+                                        MediaExportValidator.verify(this, rendered, true);
+                                        try (InputStream in = new FileInputStream(rendered);
+                                             OutputStream out = getContentResolver().openOutputStream(output)) {
+                                            if (out == null) throw new IOException("Storage access denied");
+                                            byte[] buf = new byte[65536];
+                                            int n;
+                                            while ((n = in.read(buf)) != -1) {
+                                                if (!quickExportRunning || Thread.currentThread().isInterrupted())
+                                                    throw new IOException("Export cancelled");
+                                                out.write(buf, 0, n);
+                                            }
+                                        }
+                                        if (!quickExportRunning) return;
                                         rendered.delete(); narrated.delete(); audio.delete();
                                         ui.post(() -> {
+                                            if (!quickExportRunning) return;
+                                            quickExportRunning = false;
                                             quickOutputUri = null;
                                             restoreQuickBook();
                                             if (currentTab == 1) showInterface();
-                                            status("MP4 saved with TTS voice and rough-timed subtitles. Not AI voice cloned.");
+                                            status("MP4 saved with offline TTS voice and estimated subtitles. No voice clone.");
                                         });
                                     } catch (Exception ex) {
-                                        ui.post(() -> quickExportFailed(ex.getMessage()));
+                                        ui.post(() -> {
+                                            if (quickExportRunning) quickExportFailed(ex.getMessage());
+                                        });
                                     }
                                 }, "KP-Quick-Save").start();
                             }
@@ -660,6 +675,7 @@ public class MainActivity extends Activity implements TextToSpeech.OnInitListene
                     audio = chosenNarration;
                 }
                 OfflineNarratedMuxer.export(this, source, audio, output, this::post);
+                MediaExportValidator.verify(this, output, true);
                 ui.post(() -> {
                     exportingNarration = false;
                     lastNarratedReady = true;
@@ -700,12 +716,15 @@ public class MainActivity extends Activity implements TextToSpeech.OnInitListene
                     @Override public void onComplete(File file) {
                         subtitleTransformer = null;
                         new Thread(() -> {
-                            try (InputStream in = new FileInputStream(file);
-                                 OutputStream out = getContentResolver().openOutputStream(output)) {
-                                if (out == null) throw new IOException("Cannot write MP4 output");
+                            try {
+                                MediaExportValidator.verify(this, file, lastNarratedReady);
+                                try (InputStream in = new FileInputStream(file);
+                                     OutputStream out = getContentResolver().openOutputStream(output)) {
+                                    if (out == null) throw new IOException("Cannot write MP4 output");
                                 byte[] buf = new byte[65536];
                                 int n;
-                                while ((n = in.read(buf)) != -1) out.write(buf, 0, n);
+                                    while ((n = in.read(buf)) != -1) out.write(buf, 0, n);
+                                }
                                 file.delete();
                                 ui.post(() -> {
                                     exportingSubtitleVideo = false;
