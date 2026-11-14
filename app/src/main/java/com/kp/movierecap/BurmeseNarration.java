@@ -55,14 +55,27 @@ public final class BurmeseNarration {
                     if (frames <= 0 || frames > rate * 16L)
                         throw new IllegalArgumentException("Invalid scene narration length");
                     String text = captions.get(i) == null ? "" : captions.get(i).trim();
-                    if (text.length() > 130) text = text.substring(0, 130);
+                    if (text.length() > 96) text = text.substring(0, 96);
                     float[] samples = new float[0];
                     if (!text.isEmpty()) {
                         GeneratedAudio audio = tts.generate(text, 0, 1.0f);
                         if (audio.getSampleRate() != rate)
                             throw new IllegalStateException("Inconsistent sample rate");
                         samples = audio.getSamples();
-                        if (samples == null) samples = new float[0];
+                        if (samples == null || samples.length == 0)
+                            throw new IllegalStateException("Myanmar speech model returned silence for scene " + (i + 1));
+                        if (samples.length > frames) {
+                            // Retry synthesizing at a natural, slightly faster pace instead of
+                            // silently truncating the ending of the narrated sentence.
+                            float speed = Math.min(1.65f, (float) samples.length / (float) frames * 1.04f);
+                            audio = tts.generate(text, 0, speed);
+                            if (audio.getSampleRate() != rate)
+                                throw new IllegalStateException("Inconsistent retry sample rate");
+                            samples = audio.getSamples();
+                            if (samples == null || samples.length > frames)
+                                throw new IllegalStateException("Narration exceeds scene duration " +
+                                    (i + 1) + "; reduce the caption or increase clip length");
+                        }
                     }
                     int offset = 0;
                     while (offset < frames) {
