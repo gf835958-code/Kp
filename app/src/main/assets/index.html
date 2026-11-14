@@ -17,13 +17,13 @@ body.show-advanced #scanBtn{display:block!important}
 </head>
 <body>
 <div class="app">
-<header><div class="brand"><div class="icon">🎬</div><div><b>KP MOVIE RECAP</b><small>OFFLINE VIDEO STUDIO</small></div></div><span class="pill">◉ ANDROID MVP v0.7</span></header>
+<header><div class="brand"><div class="icon">🎬</div><div><b>KP MOVIE RECAP</b><small>OFFLINE VIDEO STUDIO</small></div></div><span class="pill">◉ ANDROID MVP v0.9</span></header>
 <section class="hero"><div class="eyebrow">✦ Android-first • Private by default</div><h1>Movie ထည့်မယ်။<br><span>Recap ကို ဖန်တီးမယ်။</span></h1><p>Video ရွေးပြီး Generate တစ်ချက်နှိပ်ပါ။ Auto Scene Labels ကို MP4 Video ထဲ မြင်ရတဲ့စာတန်းအဖြစ် ထည့်ပေးနိုင်အောင် ပြင်ထားပါတယ်။ ဇာတ်လမ်းကို နားလည်ပြီး မြန်မာအသံနဲ့ ပြောတဲ့ Full Recap မဟုတ်သေးပါ။</p></section>
 <main class="workspace">
 <div class="stack">
-<section class="card"><h2><span class="step">01</span> Video Import</h2><p class="sub">Video ကို ဖုန်းထဲမှာပဲ ဖွင့်ကြည့်နိုင်ပါတယ်။ Server ကို မတင်ပါ။</p><div id="drop" class="drop" tabindex="0" role="button" aria-label="Choose video file"><div class="uploadpic">⇧</div><strong>Movie Video တစ်ခု ရွေးပါ</strong><small>MP4 / WebM / Device-supported video formats</small><button class="btn" id="choose">＋ Choose Video</button></div><input type="file" id="file" accept="video/*"><div class="video-wrap" id="videoWrap"><video controls playsinline id="preview"></video><div class="meta" id="fileMeta"></div></div><div class="fields" id="advancedFields"><div class="field"><label for="lang">Script Language</label><select id="lang"><option value="my">🇲🇲 မြန်မာ</option><option value="en">🇬🇧 English</option></select></div><div class="field"><label for="ratio">Output Frame</label><select id="ratio"><option>Original (no crop)</option></select></div><div class="field"><label for="maxScenes">Maximum Scenes</label><select id="maxScenes"><option value="6">6 scenes • Quick</option><option value="10" selected>10 scenes • Standard</option><option value="16">16 scenes • Detailed</option></select></div><div class="field"><label for="target">Highlight Clip Length</label><select id="target"><option value="2.5">2.5 Seconds</option><option value="4" selected>4 Seconds</option><option value="7">7 Seconds</option></select></div></div><button id="scanBtn" class="btn teal" style="display:none;width:100%">✦ Scan Video Scenes</button><button id="autoBtn" class="btn" style="margin-top:10px;width:100%;font-size:17px;padding:17px">⚡ Generate Video — One Click</button>
+<section class="card"><h2><span class="step">01</span> Video Import</h2><p class="sub">Video ကို ဖုန်းထဲမှာပဲ ဖွင့်ကြည့်နိုင်ပါတယ်။ Server ကို မတင်ပါ။</p><div id="drop" class="drop" tabindex="0" role="button" aria-label="Choose video file"><div class="uploadpic">⇧</div><strong>Movie Video တစ်ခု ရွေးပါ</strong><small>MP4 / WebM / Device-supported video formats</small><button class="btn" id="choose">＋ Choose Video</button></div><input type="file" id="file" accept="video/*"><div class="video-wrap" id="videoWrap"><video controls playsinline id="preview"></video><div class="meta" id="fileMeta"></div></div><div class="fields" id="advancedFields"><div class="field"><label for="lang">Script Language</label><select id="lang"><option value="my">🇲🇲 မြန်မာ</option><option value="en">🇬🇧 English</option></select></div><div class="field"><label for="ratio">Output Frame</label><select id="ratio"><option>Original (no crop)</option></select></div><div class="field"><label for="maxScenes">Maximum Scenes</label><select id="maxScenes"><option value="6">6 scenes • Quick</option><option value="10" selected>10 scenes • Standard</option><option value="16">16 scenes • Detailed</option></select></div><div class="field"><label for="target">Highlight Clip Length</label><select id="target"><option value="8">8 Seconds</option><option value="12" selected>12 Seconds</option><option value="15">15 Seconds</option></select></div></div><button id="scanBtn" class="btn teal" style="display:none;width:100%">✦ Scan Video Scenes</button><button id="autoBtn" class="btn" style="margin-top:10px;width:100%;font-size:17px;padding:17px">⚡ Generate Video — One Click</button>
 <div id="autoStatus" role="status" class="notice" style="margin-top:15px">Ready — Video ရွေးပြီး Generate Video နှိပ်ပါ။</div>
-<button id="detailsToggle" class="btn alt small" style="margin-top:12px;width:100%">Show Advanced Details</button><div id="progress"><div class="bar"><i id="progBar"></i></div><div id="progTxt" class="progress-label">Scanning…</div></div><p class="hint">MP4 ကို Movies/KP Movie Recap/ ထဲ သိမ်းပါမယ်။ <em>ဒီ Version မှာ Visual Label စာတန်းတွေကို MP4 ထဲ ထည့်ဖို့ စမ်းသပ်ထားပါတယ်။ AI Movie Script၊ မြန်မာ TTS နဲ့ အသံကိုက် Subtitle မပါသေးပါ။</em></p></section>
+<button id="detailsToggle" class="btn alt small" style="margin-top:12px;width:100%">Show Advanced Details</button><div id="progress"><div class="bar"><i id="progBar"></i></div><div id="progTxt" class="progress-label">Scanning…</div></div><p class="hint">MP4 ကို Movies/KP Movie Recap/ ထဲ သိမ်းပါမယ်။ <em>ဒီစမ်းသပ် Version မှာ မြင်ကွင်းစာတန်းအလိုက် မြန်မာအသံနဲ့ MP4 ထုတ်ရန် Code ပါတယ်။ ဇာတ်လမ်းအပြည့် နားလည်နိုင်တဲ့ AI မပါသေးပါ။</em></p></section>
 <section class="card"><h2><span class="step">02</span> Scene Timeline</h2><p class="sub">AI မြင်ကွင်းထဲရှိ အရာဝတ္ထုတွေကို အလိုအလျောက် ခွဲခြားပါမယ်။ ဇာတ်လမ်းအပြည့် နားလည်ခြင်းတော့ မဟုတ်သေးပါ။</p><div class="stat" id="stats"><span>Scenes: 0</span><span>Ready to scan</span></div><div class="scenes" id="scenes"><div class="empty">🎞️<br>Video Scan လုပ်ပြီးရင် Scene Timeline ဒီမှာ ပေါ်ပါမယ်။</div></div></section>
 </div>
 <div class="stack">
@@ -148,7 +148,7 @@ AndroidRecap.exportHighlights(JSON.stringify(clips));toast('MP4 ဖိုင်�
 function buildAutoClips(){
   const duration = lastNativeDuration || Number($('preview').duration);
   if(!Number.isFinite(duration) || duration<=0) return [];
-  const segmentLength = Number($('target').value) || 4;
+  const segmentLength = Number($('target').value) || 12;
   let clips=[], endPrev=0;
   for(const scene of shotList.slice(0,16)) {
     const start=Math.max(endPrev, Math.max(0,scene.time-.65));
@@ -161,14 +161,14 @@ function buildAutoCaptionPlan(){
   // Keep scene descriptions aligned with retained, non-overlapping clip ranges.
   const duration=lastNativeDuration || Number($('preview').duration);
   if(!Number.isFinite(duration)||duration<=0)return {clips:[],captions:[]};
-  const segmentLength=Number($('target').value)||4;
+  const segmentLength=Number($('target').value)||12;
   const clips=[],captions=[];let endPrev=0;
   for(const scene of shotList.slice(0,16)){
     const start=Math.max(endPrev,Math.max(0,scene.time-.65));
     const end=Math.min(duration,start+segmentLength);
     if(end-start>.5) {
       clips.push([start,end]);endPrev=end;
-      captions.push((scene.note||'').trim().replace(/\s+/g,' ').slice(0,130));
+      captions.push((scene.note||'').trim().replace(/\s+/g,' ').replace(/^\d{2}:\d{2}\s*/, '').slice(0,96));
     }
   }
   return {clips,captions};
@@ -200,7 +200,7 @@ $('autoBtn').onclick=async()=>{
   const plan=buildAutoCaptionPlan();
   const clips=plan.clips;
   if(!clips.length) { $('autoBtn').disabled=false;return autoStatus('❌ Video အပိုင်းတွေ ရွေးထုတ်မရပါ။'); }
-  autoStatus('Scene စာတန်းတွေကို MP4 ထဲ ပေါင်းထုတ်နေပါတယ် (Media3 rendering)...');
+  autoStatus('မြန်မာအသံနဲ့ စာတန်းတွေကို MP4 ထဲ ပေါင်းထုတ်နေပါတယ်...');
   try {
     if(typeof AndroidRecap.exportCaptionedAuto==='function') {
       AndroidRecap.exportCaptionedAuto(JSON.stringify(clips),JSON.stringify(plan.captions));
