@@ -1,0 +1,37 @@
+name: Verify Burmese TTS model (development only)
+on:
+  push:
+    branches: [kp-movie-recap-app]
+    paths:
+      - 'tools/test-burmese-tts.py'
+      - '.github/workflows/verify-burmese-tts.yml'
+  workflow_dispatch:
+jobs:
+  check-voice-model:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install CPU inference dependencies
+        run: python -m pip install 'sherpa-onnx==2.0.1' 'soundfile==0.13.1'
+      - name: Download pinned Burmese speech model in CI (not to user's phone)
+        run: |
+          mkdir -p .cache/mms-mya
+          base=https://huggingface.co/willwade/mms-tts-multilingual-models-onnx/resolve/d0f3eabab69a178ad836f5689044998909c88ae7/mya
+          curl --fail --location --retry 3 "$base/model.onnx" -o .cache/mms-mya/model.onnx
+          echo '9cc2be621aa70461da190cf9a050e8194a46257012ef7c421ae67d57742fb519  .cache/mms-mya/model.onnx' | sha256sum --check
+          curl --fail --location --retry 3 "$base/tokens.txt" -o .cache/mms-mya/tokens.txt
+      - name: Generate Burmese voice sample offline
+        run: python tools/test-burmese-tts.py .cache/mms-mya
+      - name: Upload only small generated sample, NOT proprietary model weights
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: KP-Burmese-TTS-Engine-Test-Noncommercial
+          path: burmese-tts-ci-sample.wav
+          retention-days: 3
