@@ -66,6 +66,7 @@ public final class MainActivity extends Activity {
     private TextToSpeech tts;
     private volatile boolean ttsReady = false;
     private volatile boolean exporting = false;
+    private CaptionedVideoExporter captionedExporter;
 
     @SuppressLint({"SetJavaScriptEnabled", "JavascriptInterface"})
     @Override public void onCreate(Bundle state) {
@@ -273,6 +274,87 @@ public final class MainActivity extends Activity {
         });
     }
 
+
+    /** Media3 transcodes scene clips with the auto-generated visible-text overlays.
+     * No Android device TTS, transcript, or speech alignment is implied here.
+     * Media3 must start on the main thread; its callback is also on that thread. */
+    private void exportCaptionedToMovies(List<VideoHighlightsExporter.Range> ranges,
+            List<String> captions) {
+        if (Build.VERSION.SDK_INT < 29) {
+            exporting = false;
+            autoExportFeedback(false, "Auto subtitle export requires Android 10 or newer.");
+            return;
+        }
+        final Uri source = selectedVideo;
+        if (source == null) {
+            exporting = false;
+            autoExportFeedback(false, "Video file ကို အရင်ရွေးပါ။");
+            return;
+        }
+        File temporary = new File(getCacheDir(), "kp_captioned_working.mp4");
+        try {
+            captionedExporter = new CaptionedVideoExporter();
+            captionedExporter.start(this, source, ranges, captions, temporary,
+                new CaptionedVideoExporter.Callback() {
+                    @Override public void onSuccess(File encoded) {
+                        captionedExporter = null;
+                        saveCaptionedToMovies(encoded);
+                    }
+                    @Override public void onFailure(Exception error) {
+                        captionedExporter = null;
+                        exporting = false;
+                        autoExportFeedback(false, "Captioned video export error: " + error.getMessage());
+                    }
+                });
+        } catch (Exception e) {
+            captionedExporter = null;
+            exporting = false;
+            temporary.delete();
+            autoExportFeedback(false, "Cannot start caption rendering: " + e.getMessage());
+        }
+    }
+
+    /** Publish the completed MP4 only when export has finished successfully. */
+    private void saveCaptionedToMovies(File encoded) {
+        io.execute(() -> {
+            Uri output = null;
+            try {
+                if (!encoded.exists() || encoded.length() < 1024)
+                    throw new IllegalStateException("No MP4 created");
+                ContentValues values = new ContentValues();
+                values.put(MediaStore.Video.Media.DISPLAY_NAME,
+                    "KP-Visual-Captions-" + System.currentTimeMillis() + ".mp4");
+                values.put(MediaStore.Video.Media.MIME_TYPE, "video/mp4");
+                values.put(MediaStore.Video.Media.RELATIVE_PATH,
+                    Environment.DIRECTORY_MOVIES + "/KP Movie Recap");
+                values.put(MediaStore.Video.Media.IS_PENDING, 1);
+                output = getContentResolver().insert(MediaStore.Video.Media.EXTERNAL_CONTENT_URI, values);
+                if (output == null) throw new IllegalStateException("Cannot create MP4 output");
+                try (InputStream in = new FileInputStream(encoded);
+                     OutputStream out = getContentResolver().openOutputStream(output, "w")) {
+                    if (out == null) throw new IllegalStateException("Cannot open MP4 stream");
+                    byte[] buffer = new byte[65536];
+                    int read;
+                    while ((read = in.read(buffer)) >= 0)
+                        if (read > 0) out.write(buffer, 0, read);
+                }
+                ContentValues done = new ContentValues();
+                done.put(MediaStore.Video.Media.IS_PENDING, 0);
+                getContentResolver().update(output, done, null, null);
+                autoExportFeedback(true, "Scene visual subtitles ပါတဲ့ MP4 ကို Movies/KP Movie Recap/ ထဲ သိမ်းပြီးပါပြီ။");
+            } catch (Exception e) {
+                if (output != null) {
+                    try { getContentResolver().delete(output, null, null); }
+                    catch (Exception ignored) {}
+                }
+                autoExportFeedback(false, "Captioned MP4 save failed: " + e.getMessage());
+            } finally {
+                encoded.delete();
+                exporting = false;
+            }
+        });
+    }
+
     private void autoExportFeedback(boolean success, String message) {
         runOnUiThread(() -> {
             if (webView != null) webView.evaluateJavascript(
@@ -410,6 +492,36 @@ public final class MainActivity extends Activity {
                 if (result != TextToSpeech.SUCCESS) feedback("TTS အသံထုတ်လို့ မရပါ။");
             });
         }
+        @JavascriptInterface public void exportCaptionedAuto(String rangesJson,
+                String captionsJson) {
+            runOnUiThread(() -> {
+                if (selectedVideo == null) {
+                    autoExportFeedback(false, "Video ကို အရင်ရွေးပါ။"); return;
+                }
+                if (exporting) {
+                    autoExportFeedback(false, "MP4 Export တစ်ခု လုပ်နေဆဲဖြစ်ပါတယ်။"); return;
+                }
+                try {
+                    List<VideoHighlightsExporter.Range> ranges = parseRanges(rangesJson);
+                    JSONArray array = new JSONArray(captionsJson);
+                    if (array.length() != ranges.size())
+                        throw new IllegalArgumentException("Scene caption count mismatch");
+                    List<String> captions = new ArrayList<>();
+                    for (int i = 0; i < array.length(); i++) {
+                        String caption = array.optString(i, "");
+                        if (caption.length() > 240)
+                            throw new IllegalArgumentException("Caption too long");
+                        captions.add(caption);
+                    }
+                    exporting = true;
+                    exportCaptionedToMovies(ranges, captions);
+                } catch (Exception e) {
+                    exporting = false;
+                    autoExportFeedback(false, "Caption settings invalid: " + e.getMessage());
+                }
+            });
+        }
+
         @JavascriptInterface public void exportHighlightsAuto(String rangesJson) {
             runOnUiThread(() -> {
                 if (selectedVideo == null) { autoExportFeedback(false, "Video ကို အရင်ရွေးပါ။"); return; }
