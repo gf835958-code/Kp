@@ -47,7 +47,13 @@ assert.ok(script.includes('AndroidRecap.exportCaptionedAuto('), 'UI not connecte
 assert.ok(script.includes('buildAutoCaptionPlan()'), 'Caption/clip alignment missing');
 const captioned=fs.readFileSync('app/src/main/java/com/kp/movierecap/CaptionedVideoExporter.java','utf8');
 assert.ok(captioned.includes('new OverlayEffect('), 'Media3 text overlay missing');
-assert.ok(captioned.includes('EditedMediaItemSequence.withAudioAndVideoFrom('),
-  'Media3 composition missing');
+assert.ok(captioned.includes('EditedMediaItemSequence.withAudioFrom(') &&
+  captioned.includes('EditedMediaItemSequence.withVideoFrom('),
+  'Separate Media3 voice and video tracks missing');
+assert.ok(activity.includes('BurmeseNarration.generate('), 'Offline Burmese narration not wired');
+const voice = fs.readFileSync('app/src/main/java/com/kp/movierecap/BurmeseNarration.java','utf8');
+assert.ok(voice.includes('OfflineTts('), 'Offline voice engine missing');
+assert.ok(voice.includes('mya/model.onnx'), 'Burmese model path missing');
+
 
 console.log('PASS: JS syntax, 30min scene/clip planning, native bridge and auto-export wiring');
