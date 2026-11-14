@@ -266,7 +266,9 @@ public class MainActivity extends Activity implements TextToSpeech.OnInitListene
         if (quickExportRunning) {
             addButton("■ Stop Quick Export", SURFACE, v -> {
                 quickExportRunning = false;
+                Uri abandoned = quickOutputUri;
                 quickOutputUri = null;
+                discardFailedQuickDocument(abandoned);
                 if (subtitleTransformer != null) {
                     try { subtitleTransformer.cancel(); } catch (Exception ignored) {}
                     subtitleTransformer = null;
@@ -549,9 +551,24 @@ public class MainActivity extends Activity implements TextToSpeech.OnInitListene
         }
     }
 
+    private void discardFailedQuickDocument(Uri output) {
+        if (output == null) return;
+        // ACTION_CREATE_DOCUMENT generated a new destination for this job.
+        // Delete it when validation or export fails so an empty/partial MP4
+        // is not mistaken for a successfully completed recap video.
+        new Thread(() -> {
+            try { getContentResolver().delete(output, null, null); }
+            catch (Exception ignored) {
+                // Some document providers do not allow deletion after creation.
+            }
+        }, "KP-Discard-Incomplete-MP4").start();
+    }
+
     private void quickExportFailed(String message) {
+        Uri failedDocument = quickOutputUri;
         quickExportRunning = false;
         quickOutputUri = null;
+        discardFailedQuickDocument(failedDocument);
         restoreQuickBook();
         status("Quick Export: " + message);
     }
@@ -623,6 +640,9 @@ public class MainActivity extends Activity implements TextToSpeech.OnInitListene
                                             status("MP4 saved with offline TTS voice and estimated subtitles. No voice clone.");
                                         });
                                     } catch (Exception ex) {
+                                        // Cancellation can happen while the file is being copied.
+                                        // Make a second cleanup attempt after closing the stream.
+                                        if (!quickExportRunning) discardFailedQuickDocument(output);
                                         ui.post(() -> {
                                             if (quickExportRunning) quickExportFailed(ex.getMessage());
                                         });
