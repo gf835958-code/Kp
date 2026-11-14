@@ -1,0 +1,31 @@
+plugins { id 'com.android.application'; id 'org.jetbrains.kotlin.android' }
+
+android {
+    namespace 'com.kp.recapstudio'
+    compileSdk 36
+
+    defaultConfig {
+        applicationId 'com.kp.recapstudio'
+        minSdk 26
+        targetSdk 35
+        versionCode 7
+        versionName '0.6.1-alpha'
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+}
+
+dependencies {
+    implementation 'dev.ffmpegkit-maintained:whisper-android:1.0.0'
+    implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-android:1.10.2'
+
+    testImplementation 'junit:junit:4.13.2'
+    // On-device text extraction for text-based PDFs, not scanned-image OCR.
+    implementation 'com.tom-roush:pdfbox-android:2.0.27.0'
+    implementation 'androidx.media3:media3-transformer:1.11.1'
+    implementation 'androidx.media3:media3-effect:1.11.1'
+    implementation 'androidx.media3:media3-common:1.11.1'
+}
