@@ -3,7 +3,7 @@ plugins {
 }
 android {
     namespace 'com.kp.movierecap'
-    compileSdk 35
+    compileSdk 36
     defaultConfig {
         applicationId 'com.kp.movierecap'
         minSdk 26
