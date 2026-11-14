@@ -487,7 +487,7 @@ public class MainActivity extends Activity implements TextToSpeech.OnInitListene
             try {
                 long frames = OfflineVideoMontage.write(this, source, output,
                     chosen, duration, this::post);
-                MediaExportValidator.verify(this, output, false);
+                MediaExportValidator.verify(MainActivity.this, output, false);
                 ui.post(() -> {
                     exportingMontage = false;
                     if (source.equals(videoUri)) lastMontageReady = true;
@@ -575,7 +575,7 @@ public class MainActivity extends Activity implements TextToSpeech.OnInitListene
                 if (narrated.exists() && !narrated.delete()) throw new IOException("Cannot overwrite temp MP4");
                 OfflineNarratedMuxer.export(this, selectedVideo,
                     Uri.fromFile(audio), Uri.fromFile(narrated), this::post);
-                MediaExportValidator.verify(this, narrated, true);
+                MediaExportValidator.verify(MainActivity.this, narrated, true);
                 long audioLengthUs = mediaDurationUs(Uri.fromFile(audio));
                 long videoLengthUs = mediaDurationUs(Uri.fromFile(narrated));
                 long timedLengthUs = (audioLengthUs > 0 && videoLengthUs > 0) ?
@@ -600,7 +600,7 @@ public class MainActivity extends Activity implements TextToSpeech.OnInitListene
                                     try {
                                         // Verify the full video AND narration tracks before
                                         // claiming the saved file is playable.
-                                        MediaExportValidator.verify(this, rendered, true);
+                                        MediaExportValidator.verify(MainActivity.this, rendered, true);
                                         try (InputStream in = new FileInputStream(rendered);
                                              OutputStream out = getContentResolver().openOutputStream(output)) {
                                             if (out == null) throw new IOException("Storage access denied");
@@ -675,7 +675,7 @@ public class MainActivity extends Activity implements TextToSpeech.OnInitListene
                     audio = chosenNarration;
                 }
                 OfflineNarratedMuxer.export(this, source, audio, output, this::post);
-                MediaExportValidator.verify(this, output, true);
+                MediaExportValidator.verify(MainActivity.this, output, true);
                 ui.post(() -> {
                     exportingNarration = false;
                     lastNarratedReady = true;
@@ -717,7 +717,7 @@ public class MainActivity extends Activity implements TextToSpeech.OnInitListene
                         subtitleTransformer = null;
                         new Thread(() -> {
                             try {
-                                MediaExportValidator.verify(this, file, lastNarratedReady);
+                                MediaExportValidator.verify(MainActivity.this, file, lastNarratedReady);
                                 try (InputStream in = new FileInputStream(file);
                                      OutputStream out = getContentResolver().openOutputStream(output)) {
                                     if (out == null) throw new IOException("Cannot write MP4 output");
