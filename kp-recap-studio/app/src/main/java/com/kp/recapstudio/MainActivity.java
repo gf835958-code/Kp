@@ -87,6 +87,8 @@ public class MainActivity extends Activity implements TextToSpeech.OnInitListene
     private File completedWav = null, wavWorkingFolder = null;
     private File completedM4a = null;
     private boolean exportBookM4a = false;
+    private volatile Thread m4aEncodeThread;
+    private int speechJobToken = 0;
 
     @Override public void onCreate(Bundle state) {
         super.onCreate(state);
@@ -412,10 +414,12 @@ public class MainActivity extends Activity implements TextToSpeech.OnInitListene
         addButton("🇬🇧 English Offline Voice ရွေး", SURFACE, v -> chooseVoice("en"));
         addButton("▶ စာအုပ်ဖတ်ရန်", PURPLE, v -> beginSpeak());
         addButton("⬇ Generate / Resume Long WAV", TEAL, v -> {
+            if (quickExportRunning) { status("Quick Recap Export အရင် Cancel လုပ်ပါ"); return; }
             exportBookM4a = false;
             beginWav();
         });
         addButton("⬇ Generate / Resume M4A (AAC)", PURPLE, v -> {
+            if (quickExportRunning) { status("Quick Recap Export အရင် Cancel လုပ်ပါ"); return; }
             exportBookM4a = true;
             beginWav();
         });
@@ -1040,14 +1044,26 @@ public class MainActivity extends Activity implements TextToSpeech.OnInitListene
                 @Override public void onStart(String id) { }
                 @Override public void onDone(String id) {
                     ui.post(() -> {
-                        if (id.startsWith("READ_") && reading && !cancelled) nextSpeak();
-                        else if (id.startsWith("WAV_") && exporting && !cancelled) nextWav();
+                        if (isActiveSpeechId(id, "READ_") && reading && !cancelled) nextSpeak();
+                        else if (isActiveSpeechId(id, "WAV_") && exporting && !cancelled) nextWav();
                     });
                 }
-                @Override public void onError(String id) { ui.post(() -> stopWithError("TTS Engine failed: " + id)); }
-                @Override public void onError(String id, int code) { ui.post(() -> stopWithError("TTS code " + code)); }
+                @Override public void onError(String id) {
+                    ui.post(() -> { if (isActiveSpeechId(id, "READ_") ||
+                            isActiveSpeechId(id, "WAV_"))
+                        stopWithError("TTS Engine failed: " + id); });
+                }
+                @Override public void onError(String id, int code) {
+                    ui.post(() -> { if (isActiveSpeechId(id, "READ_") ||
+                            isActiveSpeechId(id, "WAV_"))
+                        stopWithError("TTS error code " + code); });
+                }
             });
         }
+    }
+
+    private boolean isActiveSpeechId(String id, String prefix) {
+        return id != null && id.startsWith(prefix + speechJobToken + "_");
     }
 
     private void beginSpeak() {
@@ -1066,7 +1082,8 @@ public class MainActivity extends Activity implements TextToSpeech.OnInitListene
         }
         int index = speechPosition++;
         status("Reading " + speechPosition + "/" + speechParts.size());
-        int result = tts.speak(speechParts.get(index), TextToSpeech.QUEUE_FLUSH, new Bundle(), "READ_" + index);
+        int result = tts.speak(speechParts.get(index), TextToSpeech.QUEUE_FLUSH, new Bundle(),
+            "READ_" + speechJobToken + "_" + index);
         if (result == TextToSpeech.ERROR) stopWithError("TTS speak failed");
     }
 
@@ -1076,11 +1093,17 @@ public class MainActivity extends Activity implements TextToSpeech.OnInitListene
      * Changing the text or voice cannot silently reuse another recording.
      */
     private void beginWav() {
+        if (m4aEncodeThread != null && m4aEncodeThread.isAlive()) {
+            status("M4A encoding is active. Cancel it first.");
+            return;
+        }
         if (book.trim().isEmpty()) { status("စာအုပ်စာသား ထည့်ပါ"); return; }
         if (!assureOfflineVoice()) return;
         if (exporting || reading) {
             stopSpeech();
         }
+        ++speechJobToken;
+        if (quickExportRunning) exportBookM4a = false;
         cancelled = false; exporting = true;
         speechParts = splitText(book, 260);
         speechPosition = 0; audioParts.clear();
@@ -1127,14 +1150,46 @@ public class MainActivity extends Activity implements TextToSpeech.OnInitListene
             audioParts.add(file);
             status("Offline WAV: " + speechPosition + "/" + speechParts.size()
                 + " (resume supported)");
-            int result = tts.synthesizeToFile(speechParts.get(n), new Bundle(), file, "WAV_" + n);
+            int result = tts.synthesizeToFile(speechParts.get(n), new Bundle(), file,
+                "WAV_" + speechJobToken + "_" + n);
             if (result == TextToSpeech.ERROR) stopWithError("TTS failed at segment " + n);
             return;
         }
 
         exporting = false;
-        status("Merging " + audioParts.size() + " WAV chunks ...");
         final List<File> files = new ArrayList<>(audioParts);
+        if (exportBookM4a && !quickExportRunning) {
+            // Stream chunks through one AAC encoder: never merge a giant
+            // intermediate RIFF WAV, which has a hard ~4 GB limit.
+            status("Encoding " + files.size() + " chunks into streaming M4A…");
+            final int activeJob = speechJobToken;
+            Thread worker = new Thread(() -> {
+                try {
+                    File output = new File(getCacheDir(), "kp-audiobook.m4a");
+                    if (output.exists() && !output.delete())
+                        throw new IOException("Cannot overwrite old audiobook M4A");
+                    OfflineWavToAac.convertSegments(files, output);
+                    ui.post(() -> {
+                        if (isFinishing() || isDestroyed() || cancelled ||
+                                activeJob != speechJobToken) return;
+                        completedM4a = output;
+                        status("Long M4A ready — choose destination");
+                        createDocument(SAVE_M4A, "audio/mp4", "KP-Audiobook.m4a");
+                    });
+                } catch (Exception error) {
+                    ui.post(() -> {
+                        if (activeJob == speechJobToken && !cancelled)
+                            status("Long M4A error: " + error.getMessage());
+                    });
+                } finally {
+                    m4aEncodeThread = null;
+                }
+            }, "KP-M4A-Stream-Encoder");
+            m4aEncodeThread = worker;
+            worker.start();
+            return;
+        }
+        status("Merging " + files.size() + " WAV chunks ...");
         new Thread(() -> {
             try {
                 File f = new File(getCacheDir(), "kp-recap-audiobook.wav");
@@ -1145,25 +1200,6 @@ public class MainActivity extends Activity implements TextToSpeech.OnInitListene
                     if (isFinishing() || isDestroyed() || cancelled) return;
                     if (quickExportRunning) {
                         continueQuickRecap(f);
-                    } else if (exportBookM4a) {
-                        status("Offline M4A audio encoding…");
-                        new Thread(() -> {
-                            try {
-                                File target = new File(getCacheDir(), "kp-audiobook.m4a");
-                                if (target.exists() && !target.delete())
-                                    throw new IOException("Cannot overwrite old M4A");
-                                OfflineWavToAac.convert(f, target);
-                                completedM4a = target;
-                                ui.post(() -> {
-                                    if (!isFinishing() && !isDestroyed() && !cancelled) {
-                                        status("M4A ready: choose where to save");
-                                        createDocument(SAVE_M4A, "audio/mp4", "KP-Audiobook.m4a");
-                                    }
-                                });
-                            } catch (Exception e) {
-                                post("M4A encoding error: " + e.getMessage());
-                            }
-                        }, "KP-M4A-Encode").start();
                     } else {
                         createDocument(SAVE_WAV, "audio/wav", "KP-Audiobook.wav");
                     }
@@ -1199,9 +1235,12 @@ public class MainActivity extends Activity implements TextToSpeech.OnInitListene
     }
 
     private void stopSpeech() {
+        ++speechJobToken; // Invalidate callbacks from earlier utterances.
         cancelled = true;
         reading = false;
         exporting = false;
+        Thread worker = m4aEncodeThread;
+        if (worker != null && worker.isAlive()) worker.interrupt();
         if (tts != null) tts.stop();
         status("Stopped");
     }
