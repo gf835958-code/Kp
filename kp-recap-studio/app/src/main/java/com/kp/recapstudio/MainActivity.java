@@ -76,6 +76,7 @@ public class MainActivity extends Activity implements TextToSpeech.OnInitListene
     private PdfRenderer pdf;
     private ParcelFileDescriptor pdfFd;
     private ImageView pdfImage;
+    private Bitmap displayedPdfBitmap;
     private TextView pdfPageLabel;
     private int pdfPage = 0;
     private String pendingSrt = "";
@@ -1333,7 +1334,9 @@ public class MainActivity extends Activity implements TextToSpeech.OnInitListene
             recording = true; status("Recording microphone sample…"); showInterface();
         } catch (Exception e) { recording = false; status("Recording failed: " + e.getMessage()); }
     }
-    private void stopRecord() {
+    private void stopRecord() { stopRecord(true); }
+
+    private void stopRecord(boolean refreshScreen) {
         if (recorder == null) return;
         try {
             recorder.stop();
@@ -1342,7 +1345,12 @@ public class MainActivity extends Activity implements TextToSpeech.OnInitListene
             sampleName = "Recorded: " + file.getName();
             status("Sample recorded • Voice cloning still not installed");
         } catch (Exception e) { status("Recording too short or failed"); }
-        finally { recorder.release(); recorder = null; recording = false; showInterface(); }
+        finally {
+            recorder.release();
+            recorder = null;
+            recording = false;
+            if (refreshScreen && !isFinishing() && !isDestroyed()) showInterface();
+        }
     }
     private void playSample() {
         if (sampleUri == null) { status("အသံအရင်ရွေးပါ"); return; }
@@ -1368,12 +1376,21 @@ public class MainActivity extends Activity implements TextToSpeech.OnInitListene
             Bitmap bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888);
             bitmap.eraseColor(Color.WHITE);
             page.render(bitmap, null, null, PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY);
+            pdfImage.setImageDrawable(null);
+            if (displayedPdfBitmap != null && !displayedPdfBitmap.isRecycled())
+                displayedPdfBitmap.recycle();
+            displayedPdfBitmap = bitmap;
             pdfImage.setImageBitmap(bitmap);
             pdfPageLabel.setText("Page " + (pdfPage + 1) + " / " + pdf.getPageCount());
         } catch (Exception e) { status("PDF rendering error: " + e.getMessage()); }
     }
     private void closePdf() {
+        if (pdfImage != null) pdfImage.setImageDrawable(null);
         pdfImage = null;
+        if (displayedPdfBitmap != null && !displayedPdfBitmap.isRecycled()) {
+            displayedPdfBitmap.recycle();
+        }
+        displayedPdfBitmap = null;
         try { if (pdf != null) pdf.close(); } catch (Exception ignore) {}
         try { if (pdfFd != null) pdfFd.close(); } catch (Exception ignore) {}
         pdf = null; pdfFd = null;
@@ -1530,7 +1547,7 @@ public class MainActivity extends Activity implements TextToSpeech.OnInitListene
         stopSpeech();
         clearVideoScenes();
         closePdf();
-        if (recording) stopRecord();
+        if (recording) stopRecord(false);
         if (samplePlayer!=null) samplePlayer.release();
         if (tts!=null) tts.shutdown();
         super.onDestroy();
