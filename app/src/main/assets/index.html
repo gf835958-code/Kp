@@ -17,20 +17,20 @@ body.show-advanced #scanBtn{display:block!important}
 </head>
 <body>
 <div class="app">
-<header><div class="brand"><div class="icon">🎬</div><div><b>KP MOVIE RECAP</b><small>OFFLINE VIDEO STUDIO</small></div></div><span class="pill">◉ ANDROID MVP v0.6</span></header>
-<section class="hero"><div class="eyebrow">✦ Android-first • Private by default</div><h1>Movie ထည့်မယ်။<br><span>Recap ကို ဖန်တီးမယ်။</span></h1><p>Video ရွေးပြီး Generate Video တစ်ချက်နှိပ်ပါ။ AI က frame များကို စစ်ပြီး Highlight MP4 ကို ဖုန်းထဲ အလိုအလျောက် သိမ်းပါမယ်။ မြန်မာအသံနဲ့ Subtitle ပေါင်းထည့်နိုင်တဲ့ Full Recap မဟုတ်သေးပါ။</p></section>
+<header><div class="brand"><div class="icon">🎬</div><div><b>KP MOVIE RECAP</b><small>OFFLINE VIDEO STUDIO</small></div></div><span class="pill">◉ ANDROID MVP v0.7</span></header>
+<section class="hero"><div class="eyebrow">✦ Android-first • Private by default</div><h1>Movie ထည့်မယ်။<br><span>Recap ကို ဖန်တီးမယ်။</span></h1><p>Video ရွေးပြီး Generate တစ်ချက်နှိပ်ပါ။ Auto Scene Labels ကို MP4 Video ထဲ မြင်ရတဲ့စာတန်းအဖြစ် ထည့်ပေးနိုင်အောင် ပြင်ထားပါတယ်။ ဇာတ်လမ်းကို နားလည်ပြီး မြန်မာအသံနဲ့ ပြောတဲ့ Full Recap မဟုတ်သေးပါ။</p></section>
 <main class="workspace">
 <div class="stack">
 <section class="card"><h2><span class="step">01</span> Video Import</h2><p class="sub">Video ကို ဖုန်းထဲမှာပဲ ဖွင့်ကြည့်နိုင်ပါတယ်။ Server ကို မတင်ပါ။</p><div id="drop" class="drop" tabindex="0" role="button" aria-label="Choose video file"><div class="uploadpic">⇧</div><strong>Movie Video တစ်ခု ရွေးပါ</strong><small>MP4 / WebM / Device-supported video formats</small><button class="btn" id="choose">＋ Choose Video</button></div><input type="file" id="file" accept="video/*"><div class="video-wrap" id="videoWrap"><video controls playsinline id="preview"></video><div class="meta" id="fileMeta"></div></div><div class="fields" id="advancedFields"><div class="field"><label for="lang">Script Language</label><select id="lang"><option value="my">🇲🇲 မြန်မာ</option><option value="en">🇬🇧 English</option></select></div><div class="field"><label for="ratio">Output Frame</label><select id="ratio"><option>Original (no crop)</option></select></div><div class="field"><label for="maxScenes">Maximum Scenes</label><select id="maxScenes"><option value="6">6 scenes • Quick</option><option value="10" selected>10 scenes • Standard</option><option value="16">16 scenes • Detailed</option></select></div><div class="field"><label for="target">Highlight Clip Length</label><select id="target"><option value="2.5">2.5 Seconds</option><option value="4" selected>4 Seconds</option><option value="7">7 Seconds</option></select></div></div><button id="scanBtn" class="btn teal" style="display:none;width:100%">✦ Scan Video Scenes</button><button id="autoBtn" class="btn" style="margin-top:10px;width:100%;font-size:17px;padding:17px">⚡ Generate Video — One Click</button>
 <div id="autoStatus" role="status" class="notice" style="margin-top:15px">Ready — Video ရွေးပြီး Generate Video နှိပ်ပါ။</div>
-<button id="detailsToggle" class="btn alt small" style="margin-top:12px;width:100%">Show Advanced Details</button><div id="progress"><div class="bar"><i id="progBar"></i></div><div id="progTxt" class="progress-label">Scanning…</div></div><p class="hint">MP4 ကို Movies/KP Movie Recap/ ထဲ သိမ်းပါမယ်။ <em>ဒီ Beta မှာ ဇာတ်လမ်းအပြည့် AI Script၊ မြန်မာ TTS နဲ့ Video Subtitles မပါသေးပါ။</em></p></section>
+<button id="detailsToggle" class="btn alt small" style="margin-top:12px;width:100%">Show Advanced Details</button><div id="progress"><div class="bar"><i id="progBar"></i></div><div id="progTxt" class="progress-label">Scanning…</div></div><p class="hint">MP4 ကို Movies/KP Movie Recap/ ထဲ သိမ်းပါမယ်။ <em>ဒီ Version မှာ Visual Label စာတန်းတွေကို MP4 ထဲ ထည့်ဖို့ စမ်းသပ်ထားပါတယ်။ AI Movie Script၊ မြန်မာ TTS နဲ့ အသံကိုက် Subtitle မပါသေးပါ။</em></p></section>
 <section class="card"><h2><span class="step">02</span> Scene Timeline</h2><p class="sub">AI မြင်ကွင်းထဲရှိ အရာဝတ္ထုတွေကို အလိုအလျောက် ခွဲခြားပါမယ်။ ဇာတ်လမ်းအပြည့် နားလည်ခြင်းတော့ မဟုတ်သေးပါ။</p><div class="stat" id="stats"><span>Scenes: 0</span><span>Ready to scan</span></div><div class="scenes" id="scenes"><div class="empty">🎞️<br>Video Scan လုပ်ပြီးရင် Scene Timeline ဒီမှာ ပေါ်ပါမယ်။</div></div></section>
 </div>
 <div class="stack">
 <section class="card"><h2><span class="step">03</span> Recap Script</h2><p class="sub">Image Labeling ရလဒ်ကနေ Scene Observations တွေကို Auto ဖော်ပြပါတယ်။ ဇာတ်ကြောင်းကို ဖန်တီးမထားပါ။</p><button class="btn" id="draft" style="width:100%;margin-bottom:12px">🧠 Auto Visual Summary</button><textarea class="editor" id="script" spellcheck="false" placeholder="Video ကို Scan လုပ်လိုက်ရင် Visual Summary အလိုအလျောက် ပေါ်လာပါမယ်။"></textarea><p class="hint">ML Kit Image Labeling သည် မြင်ရသောအရာတွေကိုသာ ခန့်မှန်းပါတယ်။ ဇာတ်ကောင်၊ ဆက်စပ်ဇာတ်ကြောင်း၊ မျက်နှာမမြင်ရသော အဖြစ်အပျက်များကို မသိနိုင်ပါ။</p></section>
 <section class="card"><h2><span class="step">04</span> Voice & Subtitles</h2><p class="sub">Burmese TTS Model မထည့်ရသေးပါ။ English device TTS ရရှိနိုင်ပေမယ့် မြန်မာအသံက သီးခြား Engine လိုအပ်နိုင်ပါတယ်။</p><div class="linebtns"><button class="btn alt" id="speak">▶ Voice Preview</button><button class="btn alt" id="stop">■ Stop Voice</button></div><p class="hint">မြန်မာ TTS သီးသန့် Model မပါသေးတာကြောင့် မြန်မာအသံကို အာမခံမထားပါ။ Unsupported ဆိုရင် English အသံနဲ့ မြန်မာစာ မဖတ်ခိုင်းပါ။</p></section>
 <section class="card"><h2><span class="step">05</span> Export Files</h2><p class="sub">Script, SRT, ရွေးထားတဲ့ Scene Highlight MP4 နဲ့ TTS Voice File (Android) ထုတ်နိုင်ပါတယ်။</p><div class="exports"><button class="btn alt" id="txt">↓ Script .TXT</button><button class="btn alt" id="srt">↓ Subtitle .SRT</button></div><div class="exports"><button class="btn teal" id="mp4">🎞️ Scene MP4</button><button class="btn alt" id="voice">🎙️ Voice File</button></div><div class="future"><b>🎞️ MP4 Highlight Export</b><div>Android App မှာ Scan လုပ်ပြီး Scene နားက Video Highlight တွေကို မူရင်းအသံနဲ့ MP4 အဖြစ် အပိုင်းဆက်နိုင်ပါတယ်။ AI ဇာတ်လမ်းနားလည်မှု၊ Voice ပေါင်းထည့်ခြင်းနဲ့ Burn-in Subtitle မပါသေးပါ။ Browser Preview မှာ MP4 Export မရပါ။ Voice File က Device TTS Engine အပေါ်မူတည်ပါတယ်။</div></div></section>
-<section class="card"><h2>🚀 Development Roadmap</h2><ul class="roadmap"><li>Video Import & Preview</li><li>Scene Frame Scan (basic)</li><li>Editable Script + SRT Download</li><li class="later">Offline AI Movie Understanding</li><li class="later">Burmese Voice Generation & Sync</li><li>Native Android Scene MP4 Highlight Export (rough-cut)</li><li class="later">Narration + subtitle burn-in / precise sync</li><li>Native Android WebView + file picker</li></ul></section>
+<section class="card"><h2>🚀 Development Roadmap</h2><ul class="roadmap"><li>Video Import & Preview</li><li>Scene Frame Scan (basic)</li><li>Editable Script + SRT Download</li><li class="later">Offline AI Movie Understanding</li><li class="later">Burmese Voice Generation & Sync</li><li>Native Android Scene MP4 Highlight Export (rough-cut)</li><li class="later">Voice narration / speech-aligned subtitle sync</li><li>Native Android WebView + file picker</li></ul></section>
 <div class="notice"><b>🛡️ Privacy & rights</b><div>Video ဖိုင်ကို ဒီ Prototype က Server ပေါ်မပို့ပါ။ ကိုယ်ပိုင် သို့မဟုတ် အသုံးပြုခွင့်ရှိသော Video များကိုသာ Recap အဖြစ် ထုတ်ဝေပါ။</div></div>
 </div>
 </main><div class="footer">KP Movie Recap Studio • Android MVP v0.6 • No cloud upload</div></div>
@@ -157,6 +157,22 @@ function buildAutoClips(){
   }
   return clips;
 }
+function buildAutoCaptionPlan(){
+  // Keep scene descriptions aligned with retained, non-overlapping clip ranges.
+  const duration=lastNativeDuration || Number($('preview').duration);
+  if(!Number.isFinite(duration)||duration<=0)return {clips:[],captions:[]};
+  const segmentLength=Number($('target').value)||4;
+  const clips=[],captions=[];let endPrev=0;
+  for(const scene of shotList.slice(0,16)){
+    const start=Math.max(endPrev,Math.max(0,scene.time-.65));
+    const end=Math.min(duration,start+segmentLength);
+    if(end-start>.5) {
+      clips.push([start,end]);endPrev=end;
+      captions.push((scene.note||'').trim().replace(/\s+/g,' ').slice(0,130));
+    }
+  }
+  return {clips,captions};
+}
 function autoStatus(message){$('autoStatus').textContent=message;}
 window.onAutoExportResult=(success,message)=>{
   autoStatus((success?'✅ ':'❌ ')+message);
@@ -170,7 +186,7 @@ $('detailsToggle').onclick=()=>{
 };
 $('autoBtn').onclick=async()=>{
   if(!currentFile) return toast('Movie Video ကို အရင်ရွေးပါ။');
-  if(!window.AndroidRecap || typeof AndroidRecap.exportHighlightsAuto!=='function') return toast('One Click Export ကို Android APK v0.5 မှာသာ ရနိုင်ပါတယ်။');
+  if(!window.AndroidRecap || typeof AndroidRecap.exportHighlightsAuto!=='function') return toast('One Click Export ကို Android APK မှာသာ ရနိုင်ပါတယ်။');
   if(busy || $('autoBtn').disabled) return;
   $('autoBtn').disabled=true;
   $('autoBtn').textContent='⏳ Creating video…';
@@ -181,10 +197,19 @@ $('autoBtn').onclick=async()=>{
     $('autoBtn').textContent='⚡ Generate Video — One Click';
     return autoStatus('❌ Scene Scan မအောင်မြင်ပါ။ MP4 Video နဲ့ ထပ်စမ်းပါ။');
   }
-  const clips=buildAutoClips();
+  const plan=buildAutoCaptionPlan();
+  const clips=plan.clips;
   if(!clips.length) { $('autoBtn').disabled=false;return autoStatus('❌ Video အပိုင်းတွေ ရွေးထုတ်မရပါ။'); }
-  autoStatus('MP4 ကို ဖုန်း Movies folder ထဲသို့ Export လုပ်နေပါတယ်...');
-  try { AndroidRecap.exportHighlightsAuto(JSON.stringify(clips)); }
+  autoStatus('Scene စာတန်းတွေကို MP4 ထဲ ပေါင်းထုတ်နေပါတယ် (Media3 rendering)...');
+  try {
+    if(typeof AndroidRecap.exportCaptionedAuto==='function') {
+      AndroidRecap.exportCaptionedAuto(JSON.stringify(clips),JSON.stringify(plan.captions));
+    } else {
+      autoStatus('❌ Subtitle video export engine not installed in this APK.');
+      $('autoBtn').disabled=false;
+      $('autoBtn').textContent='⚡ Generate Video — One Click';
+    }
+  }
   catch(e) { window.onAutoExportResult(false,'Export failure: '+e.message); }
 };
 $('voice').onclick=()=>{let s=$('script').value.trim();if(!s)return toast('Recap Script အရင်ရေးပါ။');if(!window.AndroidRecap)return toast('Voice File ကို Android APK မှာသာ ထုတ်နိုင်ပါတယ်။');AndroidRecap.saveNarration(s,$('lang').value==='my'?'my-MM':'en-US');toast('TTS Engine ဖြင့် အသံဖိုင် ဖန်တီးနေပါတယ်။')};
