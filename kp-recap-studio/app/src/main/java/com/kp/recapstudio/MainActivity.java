@@ -47,7 +47,7 @@ import java.util.*;
 
 public class MainActivity extends Activity implements TextToSpeech.OnInitListener {
     private static final int VIDEO = 101, TXT = 102, AUDIO = 103, PDF = 104;
-    private static final int SAVE_SRT = 105, SAVE_WAV = 106, MIC = 107, SAVE_MP4 = 108, NARRATION = 109, SAVE_NARRATED_MP4 = 110, SAVE_SUBTITLE_MP4 = 111, SAVE_QUICK_MP4 = 112;
+    private static final int SAVE_SRT = 105, SAVE_WAV = 106, MIC = 107, SAVE_MP4 = 108, NARRATION = 109, SAVE_NARRATED_MP4 = 110, SAVE_SUBTITLE_MP4 = 111, SAVE_QUICK_MP4 = 112, SAVE_M4A = 113;
     private final int BACKGROUND = Color.rgb(11, 16, 31), SURFACE = Color.rgb(24, 31, 54);
     private final int WHITE = Color.rgb(238, 239, 255), MUTED = Color.rgb(169, 180, 208);
     private final int ACCENT = Color.rgb(152, 74, 252);
@@ -85,6 +85,8 @@ public class MainActivity extends Activity implements TextToSpeech.OnInitListene
     private List<File> audioParts = new ArrayList<>();
     private int speechPosition = 0;
     private File completedWav = null, wavWorkingFolder = null;
+    private File completedM4a = null;
+    private boolean exportBookM4a = false;
 
     @Override public void onCreate(Bundle state) {
         super.onCreate(state);
@@ -409,7 +411,15 @@ public class MainActivity extends Activity implements TextToSpeech.OnInitListene
         addButton("🇲🇲 မြန်မာ Offline Voice ရွေး", SURFACE, v -> chooseVoice("my"));
         addButton("🇬🇧 English Offline Voice ရွေး", SURFACE, v -> chooseVoice("en"));
         addButton("▶ စာအုပ်ဖတ်ရန်", PURPLE, v -> beginSpeak());
-        addButton("⬇ Generate / Resume Long WAV", TEAL, v -> beginWav());
+        addButton("⬇ Generate / Resume Long WAV", TEAL, v -> {
+            exportBookM4a = false;
+            beginWav();
+        });
+        addButton("⬇ Generate / Resume M4A (AAC)", PURPLE, v -> {
+            exportBookM4a = true;
+            beginWav();
+        });
+        note("M4A သည် WAV ထက် File Size သေးနိုင်ပါတယ်။ Offline AAC Encoder ရှိဖို့လိုပြီး MP3 မဟုတ်ပါ။");
         addButton("■ ရပ်ရန် / Cancel", SURFACE, v -> stopSpeech());
         addButton("💾 စာသားသိမ်းရန်", SURFACE, v -> { saveDrafts(); status("စာသားကို ဖုန်းထဲမှာ သိမ်းပြီး"); });
         addButton("🧹 အသံထုတ်ရန် သိမ်းထားတဲ့ Chunks ရှင်းရန်", SURFACE, v ->
@@ -947,19 +957,28 @@ public class MainActivity extends Activity implements TextToSpeech.OnInitListene
                     out.write(pendingSrt.getBytes(StandardCharsets.UTF_8));
                 }
                 status("SRT subtitle saved");
+            } else if (req == SAVE_M4A) {
+                if (completedM4a == null || !completedM4a.isFile())
+                    throw new IOException("No encoded M4A file");
+                copyAudioToDocument(completedM4a, uri, "M4A");
             } else if (req == SAVE_WAV) {
                 if (completedWav == null) throw new IOException("No generated audio");
-                final File file = completedWav;
-                new Thread(() -> {
-                    try (InputStream in = new FileInputStream(file); OutputStream out = getContentResolver().openOutputStream(uri)) {
-                        if (out == null) throw new IOException("Output denied");
-                        byte[] bytes = new byte[65536]; int n;
-                        while ((n = in.read(bytes)) != -1) out.write(bytes, 0, n);
-                        post("WAV ဖိုင် သိမ်းပြီး!");
-                    } catch (Exception e) { post("Save error: " + e.getMessage()); }
-                }).start();
+                copyAudioToDocument(completedWav, uri, "WAV");
             }
         } catch (Exception ex) { status("Error: " + ex.getMessage()); }
+    }
+
+    private void copyAudioToDocument(File source, Uri destination, String format) {
+        new Thread(() -> {
+            try (InputStream in = new FileInputStream(source);
+                 OutputStream out = getContentResolver().openOutputStream(destination)) {
+                if (out == null) throw new IOException("Output denied");
+                byte[] bytes = new byte[65536];
+                int n;
+                while ((n = in.read(bytes)) != -1) out.write(bytes, 0, n);
+                post(format + " Audiobook အောင်မြင်စွာ သိမ်းပြီး");
+            } catch (Exception e) { post(format + " save error: " + e.getMessage()); }
+        }, "KP-Offline-Audio-Save").start();
     }
 
     private String readText(Uri uri) throws Exception {
@@ -1059,10 +1078,14 @@ public class MainActivity extends Activity implements TextToSpeech.OnInitListene
     private void beginWav() {
         if (book.trim().isEmpty()) { status("စာအုပ်စာသား ထည့်ပါ"); return; }
         if (!assureOfflineVoice()) return;
-        stopSpeech();
+        if (exporting || reading) {
+            stopSpeech();
+        }
         cancelled = false; exporting = true;
         speechParts = splitText(book, 260);
-        speechPosition = 0; audioParts.clear(); completedWav = null;
+        speechPosition = 0; audioParts.clear();
+        completedWav = null;
+        completedM4a = null;
         try {
             String voice = tts.getVoice().getName();
             String hash = sha256Hex(voice + "|" + book);
@@ -1122,6 +1145,25 @@ public class MainActivity extends Activity implements TextToSpeech.OnInitListene
                     if (isFinishing() || isDestroyed() || cancelled) return;
                     if (quickExportRunning) {
                         continueQuickRecap(f);
+                    } else if (exportBookM4a) {
+                        status("Offline M4A audio encoding…");
+                        new Thread(() -> {
+                            try {
+                                File target = new File(getCacheDir(), "kp-audiobook.m4a");
+                                if (target.exists() && !target.delete())
+                                    throw new IOException("Cannot overwrite old M4A");
+                                OfflineWavToAac.convert(f, target);
+                                completedM4a = target;
+                                ui.post(() -> {
+                                    if (!isFinishing() && !isDestroyed() && !cancelled) {
+                                        status("M4A ready: choose where to save");
+                                        createDocument(SAVE_M4A, "audio/mp4", "KP-Audiobook.m4a");
+                                    }
+                                });
+                            } catch (Exception e) {
+                                post("M4A encoding error: " + e.getMessage());
+                            }
+                        }, "KP-M4A-Encode").start();
                     } else {
                         createDocument(SAVE_WAV, "audio/wav", "KP-Audiobook.wav");
                     }
