@@ -41,4 +41,13 @@ assert.equal(activity.split('void scanVideoNative(').length-1,1,'Duplicate or mi
 assert.ok(activity.includes('NativeSceneScanner.sample'),'Native scan not wired');
 assert.ok(scanner.includes('MediaMetadataRetriever'),'Native frame reader missing');
 assert.ok(activity.includes('Environment.DIRECTORY_MOVIES'),'Automatic file save missing');
+assert.ok(activity.includes('exportCaptionedAuto('), 'Captions bridge missing');
+assert.ok(activity.includes('saveCaptionedToMovies('), 'Caption MP4 auto-save missing');
+assert.ok(script.includes('AndroidRecap.exportCaptionedAuto('), 'UI not connected to caption exporter');
+assert.ok(script.includes('buildAutoCaptionPlan()'), 'Caption/clip alignment missing');
+const captioned=fs.readFileSync('app/src/main/java/com/kp/movierecap/CaptionedVideoExporter.java','utf8');
+assert.ok(captioned.includes('new OverlayEffect('), 'Media3 text overlay missing');
+assert.ok(captioned.includes('EditedMediaItemSequence.withAudioAndVideoFrom('),
+  'Media3 composition missing');
+
 console.log('PASS: JS syntax, 30min scene/clip planning, native bridge and auto-export wiring');
