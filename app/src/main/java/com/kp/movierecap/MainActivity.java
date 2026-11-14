@@ -386,7 +386,7 @@ public final class MainActivity extends Activity {
         for (int i = 0; i < arr.length(); i++) {
             JSONArray item = arr.getJSONArray(i);
             double start = item.getDouble(0), end = item.getDouble(1);
-            if (!Double.isFinite(start) || !Double.isFinite(end) || start < 0 || end <= start || end - start > 15) {
+            if (!Double.isFinite(start) || !Double.isFinite(end) || start < 0 || end <= start || end - start > 15.001) {
                 throw new IllegalArgumentException("Invalid clip time");
             }
             ranges.add(new VideoHighlightsExporter.Range((long)(start * 1_000_000), (long)(end * 1_000_000)));
