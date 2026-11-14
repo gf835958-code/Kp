@@ -1168,7 +1168,12 @@ public class MainActivity extends Activity implements TextToSpeech.OnInitListene
                         createDocument(SAVE_WAV, "audio/wav", "KP-Audiobook.wav");
                     }
                 });
-            } catch (Exception e) { post("Audio merge error: " + e.getMessage()); }
+            } catch (Exception e) {
+                ui.post(() -> {
+                    if (quickExportRunning) quickExportFailed("Audio merge error: " + e.getMessage());
+                    else status("Audio merge error: " + e.getMessage());
+                });
+            }
         }, "KP-WAV-Merge").start();
     }
 
