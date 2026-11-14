@@ -8,8 +8,12 @@ android {
         applicationId 'com.kp.movierecap'
         minSdk 26
         targetSdk 34
-        versionCode 7
-        versionName '0.7.0'
+        versionCode 8
+        versionName '0.8.0'
+    }
+    androidResources { noCompress 'onnx' }
+    defaultConfig {
+        ndk { abiFilters 'arm64-v8a' }
     }
     compileOptions {
         sourceCompatibility JavaVersion.VERSION_17
@@ -23,6 +27,8 @@ android {
 // Bundled on-device image labeling model; does not require a network call at runtime.
 dependencies {
     implementation 'com.google.mlkit:image-labeling:17.0.9'
+    implementation files('libs/sherpa-onnx-2.0.1.aar')
+    implementation 'org.jetbrains.kotlin:kotlin-stdlib:2.2.0'
     implementation 'androidx.media3:media3-transformer:1.11.1'
     implementation 'androidx.media3:media3-effect:1.11.1'
     implementation 'androidx.media3:media3-common:1.11.1'
