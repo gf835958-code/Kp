@@ -1,4 +1,4 @@
-# KP Recap Studio — Native Android (v0.6 experimental branch)
+# KP Recap Studio — Native Android (v0.6.1 experimental branch)
 
 **Status: experimental Android APK, not a completed one-click Movie Recap / Burmese AI Voice Cloning product.**
 The user requested to receive ONLY a feature-complete APK. Do not market or link a debug build as the final deliverable.
@@ -18,7 +18,9 @@ The user requested to receive ONLY a feature-complete APK. Do not market or link
 - Import authorized AAC/M4A narration or use the generated audiobook WAV, encode 16-bit PCM WAV to AAC using Android MediaCodec, mux audio with video into MP4 using MediaMuxer. Original audio is discarded in narration mux output; it is not mixed.
 - Burn rough-timed captions (based on 5-second script chunks) into MP4 via AndroidX Media3 Transformer, drawing native text onto decoded frames before re-encoding. If available, use the last narrated video as input, otherwise last montage or original video. **Caption timing is NOT auto-aligned to speech.**
 - Read text-based PDFs locally, extract their selectable text (PdfBox-Android), and send content to an audiobook text editor. Does not OCR scanned PDFs.
-- Import long TXT and use already-installed local/offline TTS voices where available; speak and generate chunked WAV files; resume from cached successfully generated portions after interruption using text + voice-specific cache key. Standard RIFF WAV format has a ~4GB size limit.
+- Import long TXT and use already-installed local/offline TTS voices where available; speak and generate chunked WAV files; resume from cached successfully generated portions after interruption using text + voice-specific cache key.
+- **v0.6.1 experimental:** Long-book M4A export now streams cached PCM WAV chunks through one continuous Android AAC encoder. It does not assemble a giant intermediate WAV; this removes the single classic RIFF ~4 GB **intermediate-file limitation** for M4A exports. WAV export itself still has the 4 GB container limit. The phone's free storage, uninterrupted processing, codec/device capabilities, application lifecycle, and MediaMuxer limitations can still prevent very large exports. This path is **compiled but not yet runtime verified** on vivo V27.
+- New per-utterance TTS job tokens ignore delayed callbacks from an older cancelled/finished job, preventing accidental double advancement of audio chunks.
 - Microphone recording and import/playback of consented voice samples.
 
 ## Explicitly missing from the user's final required app
@@ -46,7 +48,7 @@ The user requested to receive ONLY a feature-complete APK. Do not market or link
 - AndroidX Media3 1.11.1; PdfBox-Android 2.0.27.0; Whisper Android AAR 1.0.0 (MIT), kotlinx.coroutines-android 1.10.2; JUnit 4.13.2.
 - Local build: first download [official multilingual Whisper tiny model](https://huggingface.co/ggerganov/whisper.cpp/blob/main/ggml-tiny.bin) into `app/src/main/assets/models/ggml-tiny.bin` and verify SHA-256 above; then run `gradle testDebugUnitTest assembleDebug` in `kp-recap-studio/`. GitHub Actions automates this with a verified download/cache.
 - Debug artifact is generated on commits, intended **for testing only**, not the final user-approved release.
-- The project CI has passed native Java/Kotlin compile, JUnit tests and model-in-APK verification, which **does not** prove full runtime voice cloning or media export on actual vivo V27 hardware.
+- GitHub CI validates native Java/Kotlin compile, JUnit tests and model-in-APK verification. **CI success is not a runtime guarantee** for any Android codec/export or Burmese voice cloning feature.
 
 This project is separate from `KP-AI` and `KP-Translator`.
 
