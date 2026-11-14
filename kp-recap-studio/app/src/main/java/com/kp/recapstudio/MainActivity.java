@@ -989,14 +989,31 @@ public class MainActivity extends Activity implements TextToSpeech.OnInitListene
         Uri uri = data.getData();
         try {
             if (req == VIDEO) {
+                if (quickExportRunning || exportingMontage || exportingNarration ||
+                        exportingSubtitleVideo || transcribingVideo || analyzingScenes) {
+                    status("Current video job is running. Cancel or complete it before changing video.");
+                    return;
+                }
+                boolean videoChanged = videoUri == null || !videoUri.equals(uri);
                 videoUri = uri;
                 clearVideoScenes();
                 lastMontageReady = false;
                 lastMontageUri = null;
                 lastNarratedReady = false;
                 lastNarratedUri = null;
+                if (videoChanged) {
+                    // Never voiceover a new movie with the previous movie's
+                    // transcript or narration by accident.
+                    transcript = "";
+                    recap = "";
+                    narrationUri = null;
+                    completedWav = null;
+                    completedM4a = null;
+                    saveDrafts();
+                }
                 currentTab = 1; showInterface();
-                status("Video Imported (Local Preview)");
+                status(videoChanged ? "Video imported. Old recap/transcript cleared."
+                    : "Video Imported (Local Preview)");
             } else if (req == TXT) {
                 book = readText(uri); saveDrafts(); currentTab = 2; showInterface();
                 status("TXT Import အောင်မြင်");
