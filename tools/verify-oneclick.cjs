@@ -55,7 +55,7 @@ const voice = fs.readFileSync('app/src/main/java/com/kp/movierecap/BurmeseNarrat
 assert.ok(voice.includes('OfflineTts('), 'Offline voice engine missing');
 assert.ok(voice.includes('mya/model.onnx'), 'Burmese model path missing');
 assert.ok(voice.includes('samples.length > frames'), 'Missing speech clipping guard');
-assert.ok(script.includes('<option value="12" selected>12 Seconds</option>'), 'Narrated clip duration is too short');
+assert.ok(html.includes('<option value="12" selected>12 Seconds</option>'), 'Narrated clip duration is too short');
 assert.ok(script.includes("function buildAutoCaptionPlan()"), 'Caption clip planning missing');
 
 
