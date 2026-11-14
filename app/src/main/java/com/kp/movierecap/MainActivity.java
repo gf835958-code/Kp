@@ -291,27 +291,44 @@ public final class MainActivity extends Activity {
             autoExportFeedback(false, "Video file ကို အရင်ရွေးပါ။");
             return;
         }
-        File temporary = new File(getCacheDir(), "kp_captioned_working.mp4");
-        try {
-            captionedExporter = new CaptionedVideoExporter();
-            captionedExporter.start(this, source, ranges, captions, temporary,
-                new CaptionedVideoExporter.Callback() {
-                    @Override public void onSuccess(File encoded) {
-                        captionedExporter = null;
-                        saveCaptionedToMovies(encoded);
-                    }
-                    @Override public void onFailure(Exception error) {
-                        captionedExporter = null;
-                        exporting = false;
-                        autoExportFeedback(false, "Captioned video export error: " + error.getMessage());
-                    }
-                });
-        } catch (Exception e) {
-            captionedExporter = null;
-            exporting = false;
-            temporary.delete();
-            autoExportFeedback(false, "Cannot start caption rendering: " + e.getMessage());
-        }
+        final File output = new File(getCacheDir(), "kp_captioned_working.mp4");
+        // Never synthesize a long movie on the UI thread.
+        io.execute(() -> {
+            final File speech;
+            try {
+                speech = BurmeseNarration.generate(MainActivity.this, captions, ranges);
+            } catch (Exception | UnsatisfiedLinkError e) {
+                exporting = false;
+                autoExportFeedback(false, "Myanmar TTS not ready: " + e.getMessage());
+                return;
+            }
+            runOnUiThread(() -> {
+                try {
+                    captionedExporter = new CaptionedVideoExporter();
+                    captionedExporter.start(this, source, ranges, captions, speech, output,
+                        new CaptionedVideoExporter.Callback() {
+                            @Override public void onSuccess(File encoded) {
+                                captionedExporter = null;
+                                speech.delete();
+                                saveCaptionedToMovies(encoded);
+                            }
+                            @Override public void onFailure(Exception error) {
+                                captionedExporter = null;
+                                speech.delete();
+                                exporting = false;
+                                autoExportFeedback(false,
+                                    "Narrated MP4 error: " + error.getMessage());
+                            }
+                        });
+                } catch (Exception e) {
+                    captionedExporter = null;
+                    speech.delete();
+                    exporting = false;
+                    output.delete();
+                    autoExportFeedback(false, "Media3 render could not start: " + e.getMessage());
+                }
+            });
+        });
     }
 
     /** Publish the completed MP4 only when export has finished successfully. */
@@ -341,7 +358,7 @@ public final class MainActivity extends Activity {
                 ContentValues done = new ContentValues();
                 done.put(MediaStore.Video.Media.IS_PENDING, 0);
                 getContentResolver().update(output, done, null, null);
-                autoExportFeedback(true, "Scene visual subtitles ပါတဲ့ MP4 ကို Movies/KP Movie Recap/ ထဲ သိမ်းပြီးပါပြီ။");
+                autoExportFeedback(true, "မြန်မာအသံနဲ့ Scene စာတန်းပါတဲ့ MP4 ကို Movies/KP Movie Recap/ ထဲ သိမ်းပြီးပါပြီ။");
             } catch (Exception e) {
                 if (output != null) {
                     try { getContentResolver().delete(output, null, null); }
