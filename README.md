@@ -33,3 +33,10 @@ Do **not** call this feature complete until an end-to-end physical Android test 
 - Model and sherpa-onnx AAR are downloaded from pinned sources on CI and their SHA256 are checked before compilation; users do not need to download these independently.
 
 **Policy:** Don't ask the user to waste phone data on experimental APKs unless the actual requested features are tested and clearly described. Continue improving the existing `kp-movie-recap-app` branch; don't create a new repository.
+
+## Subtitle sizing visual regression checked (2026-11-15)
+- Android emulator proof run **43733937452** passed end-to-end. The test app generated Burmese speech and a 10-second H.264 + AAC MP4 and uploaded small proof files.
+- Proof MP4: **128×72**, 10.0 seconds, AAC mono 16 kHz and H.264 video. FFmpeg found **max_volume -14.2 dB** (non-silent speech).
+- The previous 128×72 MP4 had Burmese caption text visibly cropped. `CaptionedVideoExporter` was updated to scale font size using the video dimensions and wrap Myanmar grapheme clusters, producing a visible, fully contained caption in the same synthetic frame.
+- Proof artifact: https://github.com/gf835958-code/Kp/actions/runs/43733937452 (artifact `KP-Emulator-Burmese-Voice-Caption-Proof`).
+- This is not a feature-complete release: synthetic 10-second scene-caption proof does NOT mean a 30-minute movie can be summarized accurately. Local plot understanding and vivo V27 testing are still blockers.
