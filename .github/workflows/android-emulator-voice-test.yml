@@ -4,6 +4,7 @@ on:
     branches: [kp-movie-recap-app]
     paths:
       - 'app/src/androidTest/**'
+      - 'app/src/main/java/com/kp/movierecap/CaptionedVideoExporter.java'
       - '.github/workflows/android-emulator-voice-test.yml'
   workflow_dispatch:
 
