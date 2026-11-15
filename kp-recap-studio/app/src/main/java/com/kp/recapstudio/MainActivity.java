@@ -617,6 +617,10 @@ public class MainActivity extends Activity implements TextToSpeech.OnInitListene
                         Uri.fromFile(montage), scenePlan.scenes,
                         scenePlan.durationMs, targetMs, this::post);
                     MediaExportValidator.verify(MainActivity.this, montage, false);
+                    long visualLengthUs = mediaDurationUs(Uri.fromFile(montage));
+                    if (visualLengthUs > 0 && voiceLengthUs > visualLengthUs + 7_000_000L)
+                        throw new IOException("Generated narration is longer than the visual montage. " +
+                            "Shorten the recap script and export again to avoid clipped speech.");
                 } finally {
                     for (LocalSceneAnalyzer.Scene item : scenePlan.scenes) {
                         if (!item.thumbnail.isRecycled()) item.thumbnail.recycle();
