@@ -30,6 +30,19 @@ public final class OfflineVideoMontage {
     public static long write(Context context, Uri source, Uri destination,
                              List<LocalSceneAnalyzer.Scene> scenes,
                              long videoDurationMs, Progress progress) throws IOException {
+        return write(context, source, destination, scenes, videoDurationMs, 42000L, progress);
+    }
+
+    /**
+     * Export a concise visual montage with a scene budget based on the
+     * actual generated narration length (measured offline). This is frame
+     * selection, not AI movie comprehension. Retains existing fixed-budget
+     * API for manually selected montages.
+     */
+    public static long write(Context context, Uri source, Uri destination,
+                             List<LocalSceneAnalyzer.Scene> scenes,
+                             long videoDurationMs, long targetDurationMs,
+                             Progress progress) throws IOException {
         if (source == null || destination == null || scenes == null || scenes.isEmpty())
             throw new IOException("Video and scene timestamps are required");
         if (videoDurationMs <= 0) throw new IOException("Unknown video duration");
@@ -77,10 +90,23 @@ public final class OfflineVideoMontage {
                 ByteBuffer buffer = ByteBuffer.allocateDirect(frameCap);
                 MediaCodec.BufferInfo info = new MediaCodec.BufferInfo();
                 int clips = Math.min(scenes.size(), 12);
+                // Cap total output to roughly three minutes on modest Android
+                // hardware; use available scene time and original duration.
+                long budgetMs = Math.min(180_000L,
+                    Math.max(2_000L, targetDurationMs));
+                long clipMs = Math.max(1200L,
+                    Math.min(15000L, (budgetMs + clips - 1) / clips));
                 for (int index = 0; index < clips; index++) {
                     if (Thread.currentThread().isInterrupted()) throw new IOException("Export interrupted");
                     long startMs = Math.max(0L, scenes.get(index).timeMs);
-                    long endMs = Math.min(videoDurationMs, startMs + 3500L);
+                    long endMs = Math.min(videoDurationMs, startMs + clipMs);
+                    // Keep scene samples from overlapping each other when
+                    // visual cue timestamps are close together.
+                    if (index + 1 < clips) {
+                        long nextStartMs = scenes.get(index + 1).timeMs;
+                        if (nextStartMs > startMs)
+                            endMs = Math.min(endMs, nextStartMs);
+                    }
                     if (endMs <= startMs) continue;
                     long startUs = startMs * 1000L;
                     long endUs = endMs * 1000L;
