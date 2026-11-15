@@ -7,6 +7,9 @@ on:
       - 'tools/run-android-emulator-smoke.sh'
       - 'app/src/main/java/com/kp/movierecap/NativeSceneScanner.java'
       - 'app/src/main/java/com/kp/movierecap/CaptionedVideoExporter.java'
+      - 'app/src/main/java/com/kp/movierecap/MovieAudioSampler.java'
+      - 'app/src/main/java/com/kp/movierecap/DialogueTranscriber.java'
+      - 'tools/fetch-asr-model.sh'
       - '.github/workflows/android-emulator-voice-test.yml'
   workflow_dispatch:
 
@@ -48,12 +51,18 @@ jobs:
           echo '9cc2be621aa70461da190cf9a050e8194a46257012ef7c421ae67d57742fb519  app/src/main/assets/mya/model.onnx' | sha256sum -c -
           curl --fail --location --retry 3 --silent --show-error "$base/tokens.txt" -o app/src/main/assets/mya/tokens.txt
           test -s app/src/main/assets/mya/tokens.txt
+      - name: Fetch offline multilingual Whisper ASR assets
+        run: bash tools/fetch-asr-model.sh
       - name: Install ffmpeg for deterministic video fixture
-        run: sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg
-      - name: Generate original 12-second MP4 fixture for emulator
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg espeak-ng
+      - name: Generate original 12-second narrated movie MP4 fixture for emulator
         run: |
+          espeak-ng -v en-us -s 130 -w app/src/androidTest/assets/kp-dialogue.wav \
+            'The secret map is inside the red house. We must find the map.'
           ffmpeg -hide_banner -loglevel error -y -f lavfi -i color=c=blue:s=128x72:r=2 \
-            -t 12 -c:v libx264 -pix_fmt yuv420p -r 2 -g 2 -crf 42 -an -movflags +faststart \
+            -i app/src/androidTest/assets/kp-dialogue.wav -t 12 \
+            -c:v libx264 -pix_fmt yuv420p -r 2 -g 2 -crf 42 \
+            -c:a aac -ar 16000 -af apad -movflags +faststart \
             app/src/androidTest/assets/kp-smoke.mp4
           test -s app/src/androidTest/assets/kp-smoke.mp4
           # 30-minute movie fixture is generated on GitHub, not on the user's data plan.
