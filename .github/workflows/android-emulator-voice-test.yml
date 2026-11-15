@@ -67,3 +67,23 @@ jobs:
           emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim -camera-back none
           disable-animations: true
           script: bash tools/run-android-emulator-smoke.sh
+      - name: Verify real output codecs and nonempty audio
+        run: |
+          test -s kp-emulator-narrated-proof.mp4
+          test -s kp-emulator-burmese-proof.wav
+          ffprobe -v error -select_streams v:0 -show_entries stream=codec_name \
+            -of default=noprint_wrappers=1 kp-emulator-narrated-proof.mp4 | grep -q codec_name=
+          ffprobe -v error -select_streams a:0 -show_entries stream=codec_name \
+            -of default=noprint_wrappers=1 kp-emulator-narrated-proof.mp4 | grep -q codec_name=
+          ffmpeg -hide_banner -loglevel error -i kp-emulator-narrated-proof.mp4 \
+            -f null - 2>&1
+      - name: Keep small evidence video for private review (not a finished recap)
+        uses: actions/upload-artifact@v4
+        if: success()
+        with:
+          name: KP-Emulator-Burmese-Voice-Caption-Proof
+          path: |
+            kp-emulator-narrated-proof.mp4
+            kp-emulator-burmese-proof.wav
+          retention-days: 7
+
