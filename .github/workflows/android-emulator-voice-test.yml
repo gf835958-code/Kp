@@ -1,0 +1,73 @@
+name: Android emulator validation - Burmese narration MP4
+on:
+  push:
+    branches: [kp-movie-recap-app]
+    paths:
+      - 'app/src/androidTest/**'
+      - '.github/workflows/android-emulator-voice-test.yml'
+  workflow_dispatch:
+
+jobs:
+  phone-runtime-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.11.1'
+      - name: Enable KVM acceleration
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - name: Get verified Burmese TTS model and Android engine
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p app/libs app/src/main/assets/mya app/src/androidTest/assets
+          curl --fail --location --retry 3 --silent --show-error \
+            https://github.com/k2-fsa/sherpa-onnx/releases/download/v2.0.1/sherpa-onnx-2.0.1.aar \
+            -o app/libs/sherpa-onnx-2.0.1.aar
+          echo 'a8d09d1d32f3eb8520482c6d3d43fae674681c5b050385967c70a3c2c9bf0ee7  app/libs/sherpa-onnx-2.0.1.aar' | sha256sum -c -
+          unzip -l app/libs/sherpa-onnx-2.0.1.aar | grep -E 'jni/x86_64/libsherpa-onnx-jni.so$'
+          base=https://huggingface.co/willwade/mms-tts-multilingual-models-onnx/resolve/d0f3eabab69a178ad836f5689044998909c88ae7/mya
+          curl --fail --location --retry 3 --silent --show-error "$base/model.onnx" -o app/src/main/assets/mya/model.onnx
+          echo '9cc2be621aa70461da190cf9a050e8194a46257012ef7c421ae67d57742fb519  app/src/main/assets/mya/model.onnx' | sha256sum -c -
+          curl --fail --location --retry 3 --silent --show-error "$base/tokens.txt" -o app/src/main/assets/mya/tokens.txt
+          test -s app/src/main/assets/mya/tokens.txt
+      - name: Generate original 12-second MP4 fixture for emulator
+        run: |
+          ffmpeg -hide_banner -loglevel error -y -f lavfi -i color=c=blue:s=128x72:r=2 \
+            -t 12 -c:v libx264 -pix_fmt yuv420p -r 2 -g 2 -crf 42 -an -movflags +faststart \
+            app/src/androidTest/assets/kp-smoke.mp4
+          test -s app/src/androidTest/assets/kp-smoke.mp4
+      - name: Build Android app and test app (emulator ABI)
+        run: gradle --no-daemon --stacktrace -PemulatorTest=true :app:assembleDebug :app:assembleDebugAndroidTest
+      - name: Run real Android runtime test
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          target: google_apis
+          arch: x86_64
+          ram-size: 4096M
+          heap-size: 512M
+          cores: 2
+          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim -camera-back none
+          disable-animations: true
+          script: |
+            adb install -r app/build/outputs/apk/debug/app-debug.apk
+            adb install -r app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
+            adb shell am instrument -w -r \
+              -e class com.kp.movierecap.NarratedRecapInstrumentedTest \
+              com.kp.movierecap.test/androidx.test.runner.AndroidJUnitRunner | tee /tmp/kp-emulator-test.log
+            grep -E 'OK \(1 test\)' /tmp/kp-emulator-test.log
