@@ -869,6 +869,11 @@ public class MainActivity extends Activity implements TextToSpeech.OnInitListene
                 post("Step 2 — Whisper Tiny model transcribing Burmese speech Offline");
                 OfflineWhisperBridge.transcribeAsync(this, wav,
                     new OfflineWhisperBridge.Callback() {
+                    @Override public void onProgress(int completedChunks, int totalChunks) {
+                        if (!isFinishing() && !isDestroyed() && source.equals(videoUri))
+                            status("Offline Whisper: " + completedChunks + "/" +
+                                totalChunks + " audio sections recognized");
+                    }
                     @Override public void onText(String recognized) {
                         transcribingVideo = false;
                         wav.delete();
