@@ -262,7 +262,7 @@ public class MainActivity extends Activity implements TextToSpeech.OnInitListene
             if (!assureOfflineVoice()) return;
             createDocument(SAVE_QUICK_MP4, "video/mp4", "KP-Quick-Recap.mp4");
         });
-        note("1-TAP Mode မှာ Script မရှိရင် Video စကားသံကို Offline Whisper နဲ့ စာပြောင်းပြီး အခြေခံစကားပြောအကျဉ်းချုပ် ထုတ်မယ်။ Video ပုံရိပ်ကို AI နားလည်တာ မဟုတ်ပါ။ ဖုန်းထဲရှိ Offline TTS အသံကိုသာ သုံးပြီး မြန်မာ Clone Voice မဟုတ်ပါ။ Subtitle အချိန်ကို အသံဖိုင်အရှည်အပေါ်မူတည်ပြီး ခန့်မှန်းခွဲထားတာဖြစ်ကာ စကားလုံးအလိုက် Auto Sync မဟုတ်သေးပါ။");
+        note("1-TAP Mode: Video အသံကနေ Offline Whisper နဲ့ Transcript ထုတ်ပြီး အခြေခံအကျဉ်းချုပ်ရေးမယ်။ Video ထဲက မတူတဲ့အခန်းပုံတွေကို ရွေးပြီး Short Montage တစ်ခုအဖြစ် ပြန်ပေါင်းမယ်။ ဇာတ်လမ်းကို AI နားလည်တာ မဟုတ်ဘူး။ Offline System TTS အသံသာ သုံးထားပြီး Clone Voice မဟုတ်ပါ။ Subtitle က ခန့်မှန်းအချိန်သာ ဖြစ်ပါတယ်။");
         if (quickExportRunning) {
             addButton("■ Stop Quick Export", SURFACE, v -> {
                 quickExportRunning = false;
@@ -598,15 +598,43 @@ public class MainActivity extends Activity implements TextToSpeech.OnInitListene
             quickExportFailed("Script has no subtitle text");
             return;
         }
-        status("Step 2/4 — WAV → AAC and MP4 voiceover");
+        status("Step 2/4 — Offline voiceover + selecting visual scene montage");
         new Thread(() -> {
             try {
                 File audio = new File(getCacheDir(), "kp-quick-narration.m4a");
                 if (audio.exists() && !audio.delete()) throw new IOException("Cannot overwrite temp audio");
                 OfflineWavToAac.convert(generated, audio);
+                long voiceLengthUs = mediaDurationUs(Uri.fromFile(audio));
+                if (voiceLengthUs < 1_000_000L)
+                    throw new IOException("Offline TTS narration is empty or not decodable");
+                if (!quickExportRunning) return;
+
+                // A real recap should be a short EDITED video, not hours of
+                // unedited film with a short voiceover at the beginning.
+                // Detect visual cues locally and select a montage that roughly
+                // matches the generated narration duration.
+                post("Step 2/4 — Finding visual shot changes in source video");
+                LocalSceneAnalyzer.Result scenePlan =
+                    LocalSceneAnalyzer.analyze(this, selectedVideo);
+                File montage = new File(getCacheDir(), "kp-quick-montage.mp4");
+                try {
+                    if (montage.exists() && !montage.delete())
+                        throw new IOException("Cannot overwrite previous scene montage");
+                    long targetMs = Math.max(2000L, voiceLengthUs / 1000L);
+                    OfflineVideoMontage.write(this, selectedVideo,
+                        Uri.fromFile(montage), scenePlan.scenes,
+                        scenePlan.durationMs, targetMs, this::post);
+                    MediaExportValidator.verify(MainActivity.this, montage, false);
+                } finally {
+                    for (LocalSceneAnalyzer.Scene item : scenePlan.scenes) {
+                        if (!item.thumbnail.isRecycled()) item.thumbnail.recycle();
+                    }
+                }
+                if (!quickExportRunning) return;
                 File narrated = new File(getCacheDir(), "kp-quick-narrated.mp4");
-                if (narrated.exists() && !narrated.delete()) throw new IOException("Cannot overwrite temp MP4");
-                OfflineNarratedMuxer.export(this, selectedVideo,
+                if (narrated.exists() && !narrated.delete())
+                    throw new IOException("Cannot overwrite temp MP4");
+                OfflineNarratedMuxer.export(this, Uri.fromFile(montage),
                     Uri.fromFile(audio), Uri.fromFile(narrated), this::post);
                 MediaExportValidator.verify(MainActivity.this, narrated, true);
                 long audioLengthUs = mediaDurationUs(Uri.fromFile(audio));
@@ -646,7 +674,10 @@ public class MainActivity extends Activity implements TextToSpeech.OnInitListene
                                             }
                                         }
                                         if (!quickExportRunning) return;
-                                        rendered.delete(); narrated.delete(); audio.delete();
+                                        rendered.delete();
+                                        narrated.delete();
+                                        audio.delete();
+                                        montage.delete();
                                         ui.post(() -> {
                                             if (!quickExportRunning) return;
                                             quickExportRunning = false;
