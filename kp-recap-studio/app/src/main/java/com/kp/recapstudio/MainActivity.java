@@ -255,6 +255,25 @@ public class MainActivity extends Activity implements TextToSpeech.OnInitListene
             "🎧 Video Sound → Offline Burmese Transcript", TEAL,
             v -> transcribeVideoAudio(null));
         note("Whisper Tiny AI က Video ထဲက စကားသံကို ဖုန်းပေါ်မှာပဲ စာပြောင်းမယ်။ ဇာတ်ကွက်ပုံရိပ်တွေကို AI နားလည်တာ မဟုတ်ပါ။ အသံမပါတဲ့ Video မှာ Script မထုတ်နိုင်ပါ။");
+        addButton("🧹 Clear Saved Whisper Transcript Progress", SURFACE, v -> {
+            if (transcribingVideo) {
+                status("Wait for current transcription to finish before clearing progress");
+                return;
+            }
+            new AlertDialog.Builder(this)
+                .setTitle("Clear local transcription checkpoints?")
+                .setMessage("ပြီးထားတဲ့ ၂၇ စက္ကန့်စီ Transcript Progress ဖိုင်တွေကို ဖျက်ပါမယ်။ မူရင်း Video နဲ့ အလုပ်လုပ်ပြီးသား Draft စာသားကို မဖျက်ပါ။")
+                .setNegativeButton("Cancel", null)
+                .setPositiveButton("Clear", (dialog, which) -> {
+                    new Thread(() -> {
+                        long[] removed = new long[2];
+                        removeFilesRecursively(new File(getFilesDir(),
+                                "kp-offline-asr-checkpoints"), removed);
+                        post("Offline ASR resume checkpoints removed: " +
+                            removed[0] + " files. Original video untouched.");
+                    }, "KP-Clear-ASR-Checkpoints").start();
+                }).show();
+        });
         addButton(quickExportRunning ? "⏳ Offline Recap Export လုပ်နေသည်…" :
             "✦ 1-TAP: Video + Script → Voiceover + Subtitles MP4", PURPLE, v -> {
             if (quickExportRunning) { status("Quick export already in progress"); return; }
