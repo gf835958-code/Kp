@@ -47,8 +47,13 @@ public final class NarratedRecapInstrumentedTest {
         }
         assertTrue("30-min MP4 fixture is empty", movie.length() > 1024);
         try {
+            long scanStart = android.os.SystemClock.elapsedRealtime();
             org.json.JSONObject result =
                 NativeSceneScanner.sample(target, Uri.fromFile(movie), 10);
+            long scanElapsed = android.os.SystemClock.elapsedRealtime() - scanStart;
+            assertTrue("Native long-video scan exceeds 120-second UI timeout: " + scanElapsed + "ms",
+                scanElapsed < 115000L);
+            android.util.Log.i("KP_RECAPP_TEST", "30-minute native video scan took " + scanElapsed + "ms");
             assertTrue("Native scanner must see full 30-minute duration",
                 result.getDouble("duration") > 1790);
             org.json.JSONArray frames = result.getJSONArray("frames");
