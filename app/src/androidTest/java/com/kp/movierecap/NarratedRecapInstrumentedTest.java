@@ -49,6 +49,19 @@ public final class NarratedRecapInstrumentedTest {
             Collections.singletonList("မင်္ဂလာပါ။");
         File speech = BurmeseNarration.generate(app, captions, clips);
         assertTrue("Offline Burmese TTS created no WAV", speech.length() > 10000);
+        // A nonempty WAV file could still contain only silence; verify PCM energy.
+        int peak = 0;
+        try (java.io.RandomAccessFile pcm = new java.io.RandomAccessFile(speech, "r")) {
+            pcm.seek(44);
+            long count = Math.min(320000, (pcm.length() - 44) / 2);
+            for (int i = 0; i < count; i++) {
+                int lo = pcm.readUnsignedByte(), hi = pcm.readUnsignedByte();
+                short sample = (short) (lo | (hi << 8));
+                peak = Math.max(peak, Math.abs((int) sample));
+            }
+        }
+        assertTrue("Burmese narration is silent", peak > 300);
+
         try (java.io.RandomAccessFile riff = new java.io.RandomAccessFile(speech, "r")) {
             byte[] header = new byte[4];
             riff.readFully(header);
@@ -96,9 +109,9 @@ public final class NarratedRecapInstrumentedTest {
             assertTrue("Rendered MP4 missing Burmese voice stream", foundAudio);
         } finally {
             extractor.release();
-            speech.delete();
+            // Keep small generated evidence in the app's cache for CI extraction.
+            // This output is a 10-second synthetic test clip, NOT a full recap.
             source.delete();
-            out.delete();
         }
     }
 }
