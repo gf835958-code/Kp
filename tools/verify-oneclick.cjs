@@ -59,4 +59,10 @@ assert.ok(html.includes('<option value="12" selected>12 Seconds</option>'), 'Nar
 assert.ok(script.includes("function buildAutoCaptionPlan()"), 'Caption clip planning missing');
 
 
-console.log('PASS: JS syntax, 30min scene/clip planning, native bridge and auto-export wiring');
+assert.ok(activity.includes('transcribeVideoNative('), 'Android dialogue bridge missing');
+assert.ok(script.includes('scanDialogueContext()'), 'Offline dialogue not connected to one-click scan');
+assert.ok(fs.readFileSync('app/src/main/java/com/kp/movierecap/DialogueTranscriber.java','utf8')
+  .includes('new OfflineRecognizer('), 'On-device Whisper decoder missing');
+assert.ok(fs.readFileSync('app/src/main/java/com/kp/movierecap/MovieAudioSampler.java','utf8')
+  .includes('MediaCodec.createDecoderByType'), 'Movie audio decoder missing');
+console.log('PASS: JavaScript syntax, native 30min scene planning, offline Whisper dialogue bridge, narrated MP4 wiring');
