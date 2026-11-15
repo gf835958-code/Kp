@@ -31,10 +31,12 @@ object OfflineWhisperBridge {
     fun transcribeAsync(context: Context, wav: File, callback: Callback) {
         val app = context.applicationContext
         CoroutineScope(SupervisorJob() + Dispatchers.IO).launch {
-            val working = File.createTempFile(
-                "kp-whisper-segment-", ".wav", app.cacheDir
-            )
+            var scratchFile: File? = null
             try {
+                val working = File.createTempFile(
+                    "kp-whisper-segment-", ".wav", app.cacheDir
+                )
+                scratchFile = working
                 if (!wav.isFile || wav.length() < 100L) {
                     throw IllegalArgumentException("Extracted video audio WAV does not exist")
                 }
@@ -108,7 +110,7 @@ object OfflineWhisperBridge {
                     callback.onError("Offline native Whisper runtime unavailable: " + e.message)
                 }
             } finally {
-                working.delete()
+                scratchFile?.delete()
             }
         }
     }
