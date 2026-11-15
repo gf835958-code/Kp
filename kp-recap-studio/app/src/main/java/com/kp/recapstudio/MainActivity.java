@@ -903,7 +903,7 @@ public class MainActivity extends Activity implements TextToSpeech.OnInitListene
         transcribingVideo = true;
         status("Step 1 — Extracting soundtrack locally, no network");
         new Thread(() -> {
-            final File wav = new File(getCacheDir(), "kp-video-whisper16k.wav");
+            final File wav = new File(getCacheDir(), "kp-video-whisper-" + System.nanoTime() + ".wav");
             try {
                 VideoAudioToWav.extract(this, source, wav, this::post);
                 post("Step 2 — Whisper Tiny model transcribing Burmese speech Offline");
