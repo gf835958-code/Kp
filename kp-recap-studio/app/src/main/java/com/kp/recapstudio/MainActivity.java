@@ -533,15 +533,7 @@ public class MainActivity extends Activity implements TextToSpeech.OnInitListene
             return;
         }
         if (recap.trim().isEmpty()) {
-            StringBuilder result = new StringBuilder();
-            for (String part : transcript.split("[။.!?\\n]+")) {
-                if (!part.trim().isEmpty()) {
-                    if (result.length() > 0) result.append("။\\n");
-                    result.append(part.trim());
-                    if (result.length() > 2200) break;
-                }
-            }
-            recap = result.toString().trim();
+            recap = OfflineDialogueDigest.selectHighlights(transcript, 14, 2800);
         }
         if (recap.trim().isEmpty()) {
             status("A transcript or script is required");
@@ -843,17 +835,9 @@ public class MainActivity extends Activity implements TextToSpeech.OnInitListene
     }
 
     private static String extractiveSpeechSummary(String text) {
-        if (text == null || text.trim().isEmpty()) return "";
-        StringBuilder b = new StringBuilder();
-        int sentences = 0;
-        for (String sentence : text.split("[။.!?\\n]+")) {
-            String chunk = sentence.trim();
-            if (chunk.isEmpty()) continue;
-            if (b.length() > 0) b.append("။\\n");
-            b.append(chunk);
-            if (++sentences >= 16 || b.length() > 4000) break;
-        }
-        return b.toString();
+        // Dialogue highlights from throughout the transcript, not
+        // semantic AI story generation or a translation.
+        return OfflineDialogueDigest.selectHighlights(text, 14, 2800);
     }
 
     private void transcribeVideoAudio(Runnable afterSuccessfulTranscript) {
