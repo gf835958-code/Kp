@@ -1,0 +1,87 @@
+name: Build KP Recap Studio Native Android Debug APK
+on:
+  push:
+    branches:
+      - app/kp-recap-studio-android
+    paths:
+      - 'kp-recap-studio/**'
+      - '.github/workflows/build-kp-recap-studio.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'kp-recap-studio/**'
+      - '.github/workflows/build-kp-recap-studio.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-apk:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Locate and install Android SDK 35
+        shell: bash
+        run: |
+          export ANDROID_HOME="${ANDROID_HOME:-/usr/local/lib/android/sdk}"
+          echo "ANDROID_HOME=$ANDROID_HOME" >> "$GITHUB_ENV"
+          SDKMANAGER=$(find "$ANDROID_HOME/cmdline-tools" -type f -name sdkmanager | head -n 1)
+          echo "SDK Manager path: $SDKMANAGER"
+          test -n "$SDKMANAGER"
+          yes | "$SDKMANAGER" --sdk_root="$ANDROID_HOME" --licenses > /dev/null || true
+          "$SDKMANAGER" --sdk_root="$ANDROID_HOME" "platforms;android-36" "build-tools;35.0.0"
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.11.1'
+      - name: Cache verified offline Whisper Tiny multilingual model
+        uses: actions/cache@v4
+        with:
+          path: kp-recap-studio/app/src/main/assets/models/ggml-tiny.bin
+          key: whisper-tiny-be07e048e1e599ad46341c8d2a135645097a538221678b7acdd1b1919c6e1b21
+      - name: Bundle pinned offline Whisper Tiny model
+        working-directory: kp-recap-studio
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p app/src/main/assets/models
+          MODEL=app/src/main/assets/models/ggml-tiny.bin
+          if [ ! -f "$MODEL" ]; then
+            curl --fail --location --retry 3 --connect-timeout 30 \
+              --output "$MODEL" \
+              'https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-tiny.bin'
+          fi
+          echo 'be07e048e1e599ad46341c8d2a135645097a538221678b7acdd1b1919c6e1b21  app/src/main/assets/models/ggml-tiny.bin' | sha256sum -c -
+      - name: Compile native experimental Android debug APK
+        working-directory: kp-recap-studio
+        run: gradle --no-daemon --stacktrace testDebugUnitTest assembleDebug
+      - name: Verify native Android APK includes the complete offline speech engine
+        working-directory: kp-recap-studio
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import hashlib, zipfile
+          apk = 'app/build/outputs/apk/debug/app-debug.apk'
+          with zipfile.ZipFile(apk) as z:
+              model = 'assets/models/ggml-tiny.bin'
+              native = 'lib/arm64-v8a/libwhisper.so'
+              for name in (model, native, 'AndroidManifest.xml'):
+                  assert name in z.namelist(), f'Missing required APK entry: {name}'
+              h = hashlib.sha256()
+              with z.open(model) as src:
+                  for part in iter(lambda: src.read(1024 * 1024), b''):
+                      h.update(part)
+              expected = 'be07e048e1e599ad46341c8d2a135645097a538221678b7acdd1b1919c6e1b21'
+              assert h.hexdigest() == expected, 'Packaged Whisper Tiny SHA256 mismatch'
+              print('Verified: native Android APK bundles intact Whisper Tiny + ARM64 native engine')
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: KP-Recap-Studio-v0.6-DEVELOPMENT-debug-APK
+          path: kp-recap-studio/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
