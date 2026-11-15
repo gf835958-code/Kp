@@ -40,3 +40,8 @@ Do **not** call this feature complete until an end-to-end physical Android test 
 - The previous 128×72 MP4 had Burmese caption text visibly cropped. `CaptionedVideoExporter` was updated to scale font size using the video dimensions and wrap Myanmar grapheme clusters, producing a visible, fully contained caption in the same synthetic frame.
 - Proof artifact: https://github.com/gf835958-code/Kp/actions/runs/43733937452 (artifact `KP-Emulator-Burmese-Voice-Caption-Proof`).
 - This is not a feature-complete release: synthetic 10-second scene-caption proof does NOT mean a 30-minute movie can be summarized accurately. Local plot understanding and vivo V27 testing are still blockers.
+
+## 30-minute Native Scan Regression (2026-11-15)
+- Emulator run **43735880389**: **PASS** for both Android instrumented tests. A locally generated **1802-second H.264 video** was scanned using `NativeSceneScanner.sample()` without repeatedly seeking HTML WebView. The native scanner returned video duration, sorted scene timestamps, and appropriately encoded frame thumbnails. The same test suite also generated a short MP4 containing Burmese ONNX speech and Media3 burned-in captions, and verified audio and video tracks. [Verified GitHub Actions run](https://github.com/gf835958-code/Kp/actions/runs/43735880389).
+- **The synthetic 1802-second test does NOT establish reliability on a 438.9 MB real movie** or on vivo V27. Scan time budget (<120 seconds) is separately asserted in the updated `NarratedRecapInstrumentedTest`.
+- A true movie plot synopsis from visual context and spoken dialogue is **still not implemented**. Do not call the APK full one-click recap or force another large mobile download.
