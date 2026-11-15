@@ -763,13 +763,19 @@ public class MainActivity extends Activity implements TextToSpeech.OnInitListene
         new Thread(() -> {
             try {
                 Uri audio;
-                if (generatedWav != null) {
+                // Explicitly imported narration takes priority over a stale
+                // WAV generated for an earlier audiobook or recap.
+                if (chosenNarration != null) {
+                    audio = chosenNarration;
+                } else if (generatedWav != null && generatedWav.isFile()) {
                     post("Encoding generated TTS WAV into offline AAC");
                     File temp = new File(getCacheDir(), "kp-recap-narration.m4a");
+                    if (temp.exists() && !temp.delete())
+                        throw new IOException("Cannot replace old narration audio");
                     OfflineWavToAac.convert(generatedWav, temp);
                     audio = Uri.fromFile(temp);
                 } else {
-                    audio = chosenNarration;
+                    throw new IOException("No valid imported narration or generated WAV");
                 }
                 OfflineNarratedMuxer.export(this, source, audio, output, this::post);
                 MediaExportValidator.verify(MainActivity.this, output, true);
