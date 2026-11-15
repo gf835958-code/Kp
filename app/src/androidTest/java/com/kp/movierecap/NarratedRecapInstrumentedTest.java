@@ -30,6 +30,46 @@ import static org.junit.Assert.*;
  */
 @RunWith(AndroidJUnit4.class)
 public final class NarratedRecapInstrumentedTest {
+    /**
+     * Regression test for the exact class of failure reported by the user:
+     * WebView seeks time out when scanning a 30-minute MP4. This test exercises
+     * real Android native frame extraction on an offline 1802-second H264 file.
+     */
+    @Test public void scansThirtyMinuteVideoWithoutWebViewSeeking() throws Exception {
+        Context target = InstrumentationRegistry.getInstrumentation().getTargetContext();
+        Context runner = InstrumentationRegistry.getInstrumentation().getContext();
+        File movie = new File(target.getCacheDir(), "kp_ci_30min.mp4");
+        try (InputStream source = runner.getAssets().open("kp-long.mp4");
+             FileOutputStream out = new FileOutputStream(movie)) {
+            byte[] block = new byte[8192];
+            int read;
+            while ((read = source.read(block)) >= 0) if (read > 0) out.write(block, 0, read);
+        }
+        assertTrue("30-min MP4 fixture is empty", movie.length() > 1024);
+        try {
+            org.json.JSONObject result =
+                NativeSceneScanner.sample(target, Uri.fromFile(movie), 10);
+            assertTrue("Native scanner must see full 30-minute duration",
+                result.getDouble("duration") > 1790);
+            org.json.JSONArray frames = result.getJSONArray("frames");
+            assertTrue("30-min scan returned no timestamps", frames.length() >= 8);
+            assertTrue("30-min scan created too many memory-heavy frames", frames.length() <= 28);
+            double previousTime = -1;
+            for (int i = 0; i < frames.length(); i++) {
+                org.json.JSONObject frame = frames.getJSONObject(i);
+                double t = frame.getDouble("time");
+                assertTrue("Scene timestamp outside full movie", t >= 0 && t < 1803);
+                assertTrue("Native scanner frames out of order", t > previousTime);
+                previousTime = t;
+                String thumb = frame.optString("thumb", "");
+                assertTrue("Invalid thumbnail from native decoder",
+                    thumb.length() == 0 || thumb.startsWith("data:image/jpeg;base64,"));
+            }
+        } finally {
+            movie.delete();
+        }
+    }
+
     @Test public void generatesRealAudioVideoMp4OnAndroid() throws Exception {
         Context app = InstrumentationRegistry.getInstrumentation().getTargetContext();
         Context instrumentation = InstrumentationRegistry.getInstrumentation().getContext();
