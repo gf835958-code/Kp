@@ -3,6 +3,9 @@ package com.kp.movierecap;
 import android.content.Context;
 import android.net.Uri;
 import android.graphics.Color;
+import android.media.MediaMetadataRetriever;
+import java.text.BreakIterator;
+import java.util.Locale;
 import android.net.Uri;
 import android.text.SpannableString;
 import android.text.Spanned;
@@ -32,6 +35,51 @@ public final class CaptionedVideoExporter {
         void onFailure(Exception exception);
     }
     private Transformer transformer;
+    /** Video-scaled Burmese caption rendering with grapheme-aware line wraps. */
+    private static int[] sourceSize(Context context, Uri input) {
+        MediaMetadataRetriever reader = new MediaMetadataRetriever();
+        try {
+            reader.setDataSource(context, input);
+            String width = reader.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_WIDTH);
+            String height = reader.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_HEIGHT);
+            int w = width == null ? 720 : Integer.parseInt(width);
+            int h = height == null ? 480 : Integer.parseInt(height);
+            return new int[]{Math.max(96, w), Math.max(72, h)};
+        } catch (Exception ignored) {
+            return new int[]{720, 480};
+        } finally {
+            try { reader.release(); } catch (Exception ignored) { }
+        }
+    }
+
+    private static String wrapMyanmarCaption(String caption, int maxClusters) {
+        BreakIterator chars = BreakIterator.getCharacterInstance(Locale.forLanguageTag("my"));
+        chars.setText(caption);
+        StringBuilder out = new StringBuilder();
+        int start = chars.first();
+        int end;
+        int inLine = 0, line = 1;
+        final int maxLines = 4;
+        boolean truncated = false;
+        while ((end = chars.next()) != BreakIterator.DONE) {
+            String part = caption.substring(start, end);
+            start = end;
+            if ("\n".equals(part) || "\r".equals(part)) part = " ";
+            if (inLine >= maxClusters) {
+                if (line >= maxLines) { truncated = true; break; }
+                out.append('\n');
+                line++;
+                inLine = 0;
+                if (part.trim().isEmpty()) continue;
+            }
+            out.append(part);
+            inLine++;
+        }
+        String result = out.toString().trim();
+        if (truncated && !result.endsWith("…")) result += "…";
+        return result;
+    }
+
     public void start(Context context, Uri input,
             List<VideoHighlightsExporter.Range> ranges, List<String> captions,
             File narration, File output, Callback callback) {
@@ -42,6 +90,11 @@ public final class CaptionedVideoExporter {
         if (output.exists() && !output.delete()) {
             throw new IllegalStateException("Cannot overwrite temporary export");
         }
+        int[] dimensions = sourceSize(context, input);
+        float scale = Math.min(0.42f, Math.max(0.09f,
+            Math.min(dimensions[0] / 700.0f, dimensions[1] / 500.0f) * 0.42f));
+        int clustersPerLine = Math.max(12, Math.min(34,
+            Math.round(dimensions[0] / (scale * 90f))));
         List<EditedMediaItem> edited = new ArrayList<>();
         for (int i = 0; i < ranges.size(); i++) {
             VideoHighlightsExporter.Range r = ranges.get(i);
@@ -60,12 +113,12 @@ public final class CaptionedVideoExporter {
             if (!caption.isEmpty()) {
                 caption = caption.replaceAll("[\\r\\n\\t]+", " ");
                 if (caption.length() > 130) caption = caption.substring(0, 130) + "…";
-                SpannableString text = new SpannableString(caption);
+                SpannableString text = new SpannableString(wrapMyanmarCaption(caption, clustersPerLine));
                 text.setSpan(new ForegroundColorSpan(Color.WHITE), 0,
                     text.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
                 text.setSpan(new BackgroundColorSpan(0xC0000000), 0,
                     text.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
-                text.setSpan(new RelativeSizeSpan(0.42f), 0,
+                text.setSpan(new RelativeSizeSpan(scale), 0,
                     text.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
                 StaticOverlaySettings settings = new StaticOverlaySettings.Builder()
                     .setOverlayFrameAnchor(0f, -1f)
