@@ -605,6 +605,15 @@ public class MainActivity extends Activity implements TextToSpeech.OnInitListene
         final Uri output = quickOutputUri;
         final Uri selectedVideo = videoUri;
         final String scriptForVideo = recap;
+        // Hold immutable snapshots. The UI may later change book text, but
+        // this export must use the exact text/audio chunk pairing TTS spoke.
+        final List<String> spokenChunks = new ArrayList<>(speechParts);
+        final List<File> spokenWavParts = new ArrayList<>(audioParts);
+        if (spokenChunks.size() != spokenWavParts.size() ||
+                spokenChunks.isEmpty()) {
+            quickExportFailed("No matching narrated text/audio chunks");
+            return;
+        }
         if (CaptionTimeline.split(scriptForVideo, 95).isEmpty()) {
             quickExportFailed("Script has no subtitle text");
             return;
@@ -657,8 +666,14 @@ public class MainActivity extends Activity implements TextToSpeech.OnInitListene
                 long timedLengthUs = (audioLengthUs > 0 && videoLengthUs > 0) ?
                     Math.min(audioLengthUs, videoLengthUs) :
                     (audioLengthUs > 0 ? audioLengthUs : videoLengthUs);
+                final List<Long> utteranceDurationsUs = new ArrayList<>();
+                for (File segment : spokenWavParts)
+                    utteranceDurationsUs.add(wavDurationUs(segment));
                 final List<CaptionTimeline.Cue> subtitles =
-                    CaptionTimeline.plan(scriptForVideo, timedLengthUs, 95);
+                    NarrationAlignedCaptions.plan(spokenChunks,
+                        utteranceDurationsUs, timedLengthUs, 95);
+                if (subtitles.isEmpty())
+                    throw new IOException("No spoken captions to render");
                 ui.post(() -> {
                     if (!quickExportRunning || isFinishing() || isDestroyed()) return;
                     status("Step 3/4 — Burn subtitles into MP4 frames");
@@ -1566,6 +1581,20 @@ public class MainActivity extends Activity implements TextToSpeech.OnInitListene
             return new WavPart(source, dataOffset, dataLen, fmt);
         }
     }
+    /** Duration from actual TTS PCM samples, independent of Android media metadata. */
+    private static long wavDurationUs(File file) throws IOException {
+        WavPart part = inspectWav(file);
+        byte[] fmt = part.fmt;
+        if (fmt.length < 16) throw new IOException("Bad TTS PCM format");
+        int rate = (fmt[4] & 255) | ((fmt[5] & 255) << 8) |
+            ((fmt[6] & 255) << 16) | ((fmt[7] & 255) << 24);
+        int align = (fmt[12] & 255) | ((fmt[13] & 255) << 8);
+        if (rate <= 0 || align <= 0 || part.length < align)
+            throw new IOException("Invalid TTS WAV sample rate/block size");
+        long samples = part.length / align;
+        return Math.max(1L, samples * 1_000_000L / rate);
+    }
+
     private static void mergeWavs(List<File> inputs, File target) throws IOException {
         if (inputs.isEmpty()) throw new IOException("No WAV pieces");
         List<WavPart> parts = new ArrayList<>();
