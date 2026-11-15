@@ -36,7 +36,7 @@ body.show-advanced #scanBtn{display:block!important}
 </main><div class="footer">KP Movie Recap Studio • Android MVP v0.6 • No cloud upload</div></div>
 <div id="toast" role="status"></div>
 <script>
-const $=id=>document.getElementById(id);let currentFile=null,objectUrl=null,shotList=[],busy=false,demoMode=false;let labelWaiters=new Map();let lastNativeDuration=0;let nativeScanResolve=null;
+const $=id=>document.getElementById(id);let currentFile=null,objectUrl=null,shotList=[],busy=false,demoMode=false;let labelWaiters=new Map();let lastNativeDuration=0;let nativeScanResolve=null;let nativeDialogueResolve=null;
 const fn=()=>currentFile?currentFile.name.replace(/\.[^.]+$/,''):'KP-Movie-Recap';
 function toast(msg){$('toast').textContent=msg;$('toast').style.display='block';clearTimeout(toast.t);toast.t=setTimeout(()=>$('toast').style.display='none',4000)}
 function formatTime(s){if(!Number.isFinite(s))return '00:00';let x=Math.max(0,Math.floor(s));return String(Math.floor(x/60)).padStart(2,'0')+':'+String(x%60).padStart(2,'0')}
@@ -71,6 +71,48 @@ function scanNativeFrames(){
     catch(e){clearTimeout(timer);nativeScanResolve=null;reject(e);}
   });
 }
+window.onNativeDialogueResult=(payload,error)=>{
+  if(nativeDialogueResolve){const cb=nativeDialogueResolve;nativeDialogueResolve=null;cb(payload,error||'');}
+};
+async function scanDialogueContext(){
+  if(!window.AndroidRecap || typeof AndroidRecap.transcribeVideoNative!=='function'
+     || !shotList.length || demoMode)return;
+  // A handful of short, distributed audio windows rather than decoding the
+  // entire film or allocating the full movie in memory.
+  const indexes=[0,Math.floor((shotList.length-1)/2),shotList.length-1];
+  const times=[...new Set(indexes)].map(i=>shotList[i].time);
+  try{
+    const payload=await new Promise((resolve,reject)=>{
+      const timer=setTimeout(()=>{nativeDialogueResolve=null;
+        reject(Error('Dialogue recognition exceeded time budget'))},240000);
+      nativeDialogueResolve=(result,error)=>{
+        clearTimeout(timer);
+        if(error)reject(Error(error));else resolve(result);
+      };
+      try{AndroidRecap.transcribeVideoNative(JSON.stringify(times));}
+      catch(e){clearTimeout(timer);nativeDialogueResolve=null;reject(e);}
+    });
+    for(const observation of (payload?.dialogues||[])){
+      if(!observation || typeof observation.text!=='string')continue;
+      let best=shotList[0];
+      for(const scene of shotList)
+        if(Math.abs(scene.time-observation.time)<Math.abs(best.time-observation.time))
+          best=scene;
+      best.dialogueEvidence=observation.text.slice(0,240);
+      best.spokenLanguage=observation.lang||'';
+      // Only reuse actual Burmese speech as Burmese narration. English and
+      // other dialogue require a genuinely supported translation model.
+      if(best.spokenLanguage==='my' && /[\u1000-\u109f]/.test(best.dialogueEvidence)){
+        best.note='မြင်ကွင်းထဲက စကားသံတွင် “'+
+          best.dialogueEvidence.slice(0,48)+'” ဟု ကြားရပါတယ်။';
+      }
+    }
+    renderShots();
+  }catch(err){
+    // Speech-free films or an unavailable model should not corrupt video scan.
+    console.warn('Dialogue evidence unavailable:',err.message);
+  }
+}
 function chooseNativeScenes(frames,duration,limit){
   if(!Array.isArray(frames)||!frames.length)throw Error('No native frames returned');
   const sorted=frames.filter(f=>Number.isFinite(f.time)).sort((a,b)=>a.time-b.time);
@@ -96,6 +138,8 @@ if(window.AndroidRecap && typeof AndroidRecap.scanVideoNative==='function' && !d
   shotList=picks.map(p=>({...p,labels:[],note:''}));
   renderShots();setProgress(75,'Labeling representative images');
   await analyzeAllFrames();
+  setProgress(87,'Sampling real spoken dialogue offline');
+  await scanDialogueContext();
   $('draft').click();setProgress(100,'Native scene scan complete');
   toast(shotList.length+' frames scanned with Android native decoder.');
   return;
@@ -129,8 +173,8 @@ async function analyzeAllFrames(){
  shotList.forEach((s,i)=>{s.labels=result[i];s.note=sceneCaption(result[i],s.time)});
  renderShots();
 }
-function renderShots(){$('stats').innerHTML='<span>Scenes: '+shotList.length+'</span><span>'+(shotList.length?'Auto image labels':'Ready to scan')+'</span>';let root=$('scenes');root.textContent='';if(!shotList.length){let d=document.createElement('div');d.className='empty';d.textContent='🎞️  Video Scan လုပ်ပြီးရင် Scene Timeline ဒီမှာ ပေါ်ပါမယ်။';root.append(d);return}shotList.forEach((s,i)=>{let d=document.createElement('div');d.className='scene';let img=document.createElement('img');img.src=s.thumb;img.alt='Frame at '+formatTime(s.time);img.addEventListener('click',()=>{$('preview').currentTime=s.time;$('preview').scrollIntoView({behavior:'smooth',block:'center'})});let box=document.createElement('div'),label=document.createElement('small');label.textContent='SCENE '+String(i+1).padStart(2,'0')+' • '+formatTime(s.time);let area=document.createElement('div');area.className='visualnote';area.setAttribute('aria-label','Auto visual observation for scene '+(i+1));area.textContent=s.note || 'Analyzing scene…';box.append(label,area);d.append(img,box);root.append(d)})}
-$('draft').onclick=()=>{if(!shotList.length){toast('Scene Scan အရင်လုပ်ပါ။');return}let used=shotList; if(!used.length)return;let my=$('lang').value==='my';let opening=my?'ဤစာသားသည် AI မြင်ကွင်းအချက်အလက် စမ်းသပ်ချက်သာဖြစ်ပြီး ရုပ်ရှင်ဇာတ်လမ်း အကျဉ်းချုပ်အမှန် မဟုတ်ပါ။\n\n':'Automated visual observations only. This is not a reliable movie plot recap.\n\n';let body=used.map((x,i)=>x.note.trim()).join('\n\n');$('script').value=opening+body;toast('Visual Summary ဖန်တီးပြီးပါပြီ။')};
+function renderShots(){$('stats').innerHTML='<span>Scenes: '+shotList.length+'</span><span>'+(shotList.length?'Auto image labels':'Ready to scan')+'</span>';let root=$('scenes');root.textContent='';if(!shotList.length){let d=document.createElement('div');d.className='empty';d.textContent='🎞️  Video Scan လုပ်ပြီးရင် Scene Timeline ဒီမှာ ပေါ်ပါမယ်။';root.append(d);return}shotList.forEach((s,i)=>{let d=document.createElement('div');d.className='scene';let img=document.createElement('img');img.src=s.thumb;img.alt='Frame at '+formatTime(s.time);img.addEventListener('click',()=>{$('preview').currentTime=s.time;$('preview').scrollIntoView({behavior:'smooth',block:'center'})});let box=document.createElement('div'),label=document.createElement('small');label.textContent='SCENE '+String(i+1).padStart(2,'0')+' • '+formatTime(s.time);let area=document.createElement('div');area.className='visualnote';area.setAttribute('aria-label','Auto visual observation for scene '+(i+1));area.textContent=(s.note || 'Analyzing scene…')+(s.dialogueEvidence?'\n🎧 '+s.dialogueEvidence:'');box.append(label,area);d.append(img,box);root.append(d)})}
+$('draft').onclick=()=>{if(!shotList.length){toast('Scene Scan အရင်လုပ်ပါ။');return}let used=shotList; if(!used.length)return;let my=$('lang').value==='my';let opening=my?'ဤစာသားသည် AI မြင်ကွင်းအချက်အလက် စမ်းသပ်ချက်သာဖြစ်ပြီး ရုပ်ရှင်ဇာတ်လမ်း အကျဉ်းချုပ်အမှန် မဟုတ်ပါ။\n\n':'Automated visual observations only. This is not a reliable movie plot recap.\n\n';let body=used.map((x,i)=>x.note.trim()+(x.dialogueEvidence?'\n[Audio transcript '+(x.spokenLanguage||'?')+'] '+x.dialogueEvidence:'')).join('\n\n');$('script').value=opening+body;toast('Visual Summary ဖန်တီးပြီးပါပြီ။')};
 window.nativeTtsFeedback=msg=>toast(msg);
 $('speak').onclick=()=>{let s=$('script').value.trim();if(!s){toast('Script အရင်ထည့်ပါ။');return}let loc=$('lang').value==='my'?'my-MM':'en-US';if(window.AndroidRecap){AndroidRecap.speak(s,loc);return}if(!('speechSynthesis'in window)){toast('TTS မရပါ။');return}speechSynthesis.cancel();let u=new SpeechSynthesisUtterance(s.slice(0,2700));u.lang=loc;u.rate=.92;speechSynthesis.speak(u);toast('Voice Preview စတင်နေပါတယ်။')};
 $('stop').onclick=()=>{if(window.AndroidRecap)AndroidRecap.stopSpeech();if('speechSynthesis'in window)speechSynthesis.cancel()};
