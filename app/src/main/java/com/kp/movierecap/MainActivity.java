@@ -404,6 +404,15 @@ public final class MainActivity extends Activity {
         });
     }
 
+    private void reportNativeDialogue(JSONObject payload, String error) {
+        runOnUiThread(() -> {
+            if (webView == null) return;
+            String json = payload == null ? "null" : payload.toString();
+            webView.evaluateJavascript("window.onNativeDialogueResult(" + json + "," +
+                JSONObject.quote(error == null ? "" : error) + ")", null);
+        });
+    }
+
     private int configureTts(String tag) {
         if (!ttsReady || tts == null) { feedback("ဖုန်းမှာ TTS Engine မရသေးပါ။"); return TextToSpeech.ERROR; }
         int status = tts.setLanguage(Locale.forLanguageTag(tag));
@@ -457,6 +466,32 @@ public final class MainActivity extends Activity {
                     reportNativeScan(null, e.getClass().getSimpleName() + ": " + e.getMessage());
                 }
             });
+        }
+
+        @JavascriptInterface public void transcribeVideoNative(String timesJson) {
+            Uri source = selectedVideo;
+            if (source == null) { reportNativeDialogue(null, "No video selected"); return; }
+            try {
+                JSONArray times = new JSONArray(timesJson);
+                if (times.length() == 0 || times.length() > 8)
+                    throw new IllegalArgumentException("Invalid audio scene count");
+                double[] timestamps = new double[times.length()];
+                for (int i = 0; i < times.length(); i++) {
+                    timestamps[i] = times.getDouble(i);
+                    if (!Double.isFinite(timestamps[i]) || timestamps[i] < 0)
+                        throw new IllegalArgumentException("Invalid timestamp");
+                }
+                io.execute(() -> {
+                    try {
+                        reportNativeDialogue(DialogueTranscriber.transcribe(
+                            MainActivity.this, source, timestamps), "");
+                    } catch (Exception | UnsatisfiedLinkError err) {
+                        reportNativeDialogue(null, "Dialogue ASR unavailable: " + err.getMessage());
+                    }
+                });
+            } catch (Exception e) {
+                reportNativeDialogue(null, "Invalid dialogue timestamps: " + e.getMessage());
+            }
         }
 
         @JavascriptInterface public void speak(String text, String tag) {
