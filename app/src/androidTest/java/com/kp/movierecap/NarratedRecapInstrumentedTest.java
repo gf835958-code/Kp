@@ -95,6 +95,10 @@ public final class NarratedRecapInstrumentedTest {
         assertTrue("Whisper recognizer produced no dialogue evidence", evidence.length() > 0);
         String heard = evidence.getJSONObject(0).getString("text");
         assertTrue("Empty actual speech transcript", heard.trim().length() >= 4);
+        String recognized = heard.toLowerCase(java.util.Locale.ROOT);
+        assertTrue("Speech recognizer missed the actual movie dialogue (map / house)",
+            recognized.contains("map") || recognized.contains("house"));
+
         System.out.println("KP OFFLINE ASR evidence: " + heard);
 
         VideoHighlightsExporter.Range clip =
