@@ -54,6 +54,11 @@ jobs:
             -t 12 -c:v libx264 -pix_fmt yuv420p -r 2 -g 2 -crf 42 -an -movflags +faststart \
             app/src/androidTest/assets/kp-smoke.mp4
           test -s app/src/androidTest/assets/kp-smoke.mp4
+          # 30-minute movie fixture is generated on GitHub, not on the user's data plan.
+          ffmpeg -hide_banner -loglevel error -y -f lavfi -i color=c=blue:s=128x72:r=1 \
+            -t 1802 -c:v libx264 -preset ultrafast -pix_fmt yuv420p -r 1 -g 1 \
+            -crf 43 -an -movflags +faststart app/src/androidTest/assets/kp-long.mp4
+          test -s app/src/androidTest/assets/kp-long.mp4
       - name: Build Android app and test app (emulator ABI)
         run: gradle --no-daemon --stacktrace -PemulatorTest=true :app:assembleDebug :app:assembleDebugAndroidTest
       - name: Run real Android runtime test
