@@ -31,7 +31,9 @@ object OfflineWhisperBridge {
     fun transcribeAsync(context: Context, wav: File, callback: Callback) {
         val app = context.applicationContext
         CoroutineScope(SupervisorJob() + Dispatchers.IO).launch {
-            val working = File(app.cacheDir, "kp-whisper-current-chunk.wav")
+            val working = File.createTempFile(
+                "kp-whisper-segment-", ".wav", app.cacheDir
+            )
             try {
                 if (!wav.isFile || wav.length() < 100L) {
                     throw IllegalArgumentException("Extracted video audio WAV does not exist")
@@ -40,30 +42,59 @@ object OfflineWhisperBridge {
                     wav, OfflineWavChunker.DEFAULT_SECONDS
                 )
                 if (total < 1) throw IllegalArgumentException("Empty video speech WAV")
-                var current = 0
+                // Exact audio-content SHA-256 keeps resume checkpoints from
+                // accidentally applying to a different movie or soundtrack.
+                val checkpointDir = OfflineTranscriptCheckpoints.jobDirectory(app, wav)
+                val cached = (0 until total).map {
+                    OfflineTranscriptCheckpoints.read(checkpointDir, it)
+                }
                 val transcription = StringBuilder()
-                val model = Whisper.loadModelFromAsset(app, "models/ggml-tiny.bin")
-                try {
-                    while (current < total) {
-                        OfflineWavChunker.writeChunk(
-                            wav, working, current, OfflineWavChunker.DEFAULT_SECONDS
-                        )
-                        val result = Whisper.transcribe(
-                            model, working.absolutePath,
-                            WhisperConfig(language = "my")
-                        )
-                        val recognized = result.text.trim()
+                if (cached.all { it != null }) {
+                    // Fully processed earlier: avoid loading the native AI model.
+                    for (part in cached) {
+                        val recognized = part.orEmpty().trim()
                         if (recognized.isNotEmpty()) {
                             if (transcription.isNotEmpty()) transcription.append('\n')
                             transcription.append(recognized)
                         }
-                        current++
-                        withContext(Dispatchers.Main) {
-                            callback.onProgress(current, total)
-                        }
                     }
-                } finally {
-                    Whisper.releaseModel(model)
+                    withContext(Dispatchers.Main) {
+                        callback.onProgress(total, total)
+                    }
+                } else {
+                    val model = Whisper.loadModelFromAsset(
+                        app, "models/ggml-tiny.bin"
+                    )
+                    try {
+                        for (index in 0 until total) {
+                            var recognized = cached[index]
+                            if (recognized == null) {
+                                OfflineWavChunker.writeChunk(
+                                    wav, working, index,
+                                    OfflineWavChunker.DEFAULT_SECONDS
+                                )
+                                val result = Whisper.transcribe(
+                                    model, working.absolutePath,
+                                    WhisperConfig(language = "my")
+                                )
+                                recognized = result.text.trim()
+                                // Flush atomically AFTER successful inference.
+                                // Empty recognized text also counts as completed.
+                                OfflineTranscriptCheckpoints.write(
+                                    checkpointDir, index, recognized
+                                )
+                            }
+                            if (recognized.isNotEmpty()) {
+                                if (transcription.isNotEmpty()) transcription.append('\n')
+                                transcription.append(recognized)
+                            }
+                            withContext(Dispatchers.Main) {
+                                callback.onProgress(index + 1, total)
+                            }
+                        }
+                    } finally {
+                        Whisper.releaseModel(model)
+                    }
                 }
                 withContext(Dispatchers.Main) {
                     callback.onText(transcription.toString().trim())
