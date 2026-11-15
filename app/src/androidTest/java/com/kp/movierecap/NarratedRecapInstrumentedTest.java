@@ -86,6 +86,17 @@ public final class NarratedRecapInstrumentedTest {
             while ((n = in.read(buffer)) >= 0) if (n > 0) out.write(buffer, 0, n);
         }
         assertTrue("Synthetic source video is empty", source.length() > 1024);
+        // The source now contains original synthetic spoken English dialogue.
+        // Test the existing on-device Whisper library and bounded MediaCodec
+        // decode path, without using an external transcription API.
+        org.json.JSONObject dialogue = DialogueTranscriber.transcribe(
+            app, Uri.fromFile(source), new double[]{3.0});
+        org.json.JSONArray evidence = dialogue.getJSONArray("dialogues");
+        assertTrue("Whisper recognizer produced no dialogue evidence", evidence.length() > 0);
+        String heard = evidence.getJSONObject(0).getString("text");
+        assertTrue("Empty actual speech transcript", heard.trim().length() >= 4);
+        System.out.println("KP OFFLINE ASR evidence: " + heard);
+
         VideoHighlightsExporter.Range clip =
             new VideoHighlightsExporter.Range(0L, 10000000L);
         java.util.List<VideoHighlightsExporter.Range> clips =
