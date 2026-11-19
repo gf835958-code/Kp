@@ -11,7 +11,9 @@ import com.k2fsa.sherpa.onnx.OfflineStream;
 import com.k2fsa.sherpa.onnx.OfflineWhisperModelConfig;
 import org.json.JSONArray;
 import org.json.JSONObject;
-import java.util.Arrays;
+import java.util.HashSet;
+import java.util.Locale;
+import java.util.Set;
 
 /**
  * Offline spoken-dialogue recognition. Provides direct quotes as evidence,
@@ -45,6 +47,7 @@ public final class DialogueTranscriber {
             config.setModelConfig(model);
             recognizer = new OfflineRecognizer(context.getAssets(), config);
             JSONArray evidence = new JSONArray();
+            Set<String> seenText = new HashSet<>();
             for (int i = 0; i < times.length; i++) {
                 if (!Double.isFinite(times[i]) || times[i] < 0)
                     throw new IllegalArgumentException("Invalid timestamp");
@@ -53,16 +56,30 @@ public final class DialogueTranscriber {
                 // at most one 12-second window at a time.
                 float[] speech = MovieAudioSampler.sample(context, movie, microseconds, 12);
                 if (speech.length == 0) continue;
+                // Whisper tiny can hallucinate words in complete silence.
+                // Skip truly silent/near-silent decoded windows before inference.
+                double power = 0;
+                float peak = 0f;
+                for (float sample : speech) {
+                    power += sample * sample;
+                    peak = Math.max(peak, Math.abs(sample));
+                }
+                double rms = Math.sqrt(power / Math.max(1, speech.length));
+                if (rms < 0.003 && peak < 0.02f) continue;
                 OfflineStream stream = recognizer.createStream();
                 try {
                     stream.acceptWaveform(speech, MovieAudioSampler.SAMPLE_RATE);
                     recognizer.decode(stream);
                     OfflineRecognizerResult result = recognizer.getResult(stream);
-                    String recognized = result.getText().trim().replaceAll("\\s+", " ");
+                    String raw = result.getText();
+                    String recognized = raw == null ? "" : raw.trim().replaceAll("\\s+", " ");
                     if (recognized.length() > 260)
                         recognized = recognized.substring(0, 260);
                     // Do not fabricate a line when no speech can be understood.
                     if (recognized.length() < 3) continue;
+                    String normalized = recognized.toLowerCase(Locale.ROOT)
+                        .replaceAll("[\\p{Punct}\\s]+", " ").trim();
+                    if (normalized.length() < 3 || !seenText.add(normalized)) continue;
                     JSONObject item = new JSONObject();
                     item.put("time", times[i]);
                     item.put("lang", result.getLang());
@@ -74,7 +91,9 @@ public final class DialogueTranscriber {
             }
             JSONObject payload = new JSONObject();
             payload.put("dialogues", evidence);
-            payload.put("method", "Whisper tiny multilingual, sampled 12-second excerpts");
+            payload.put("method", "Whisper tiny multilingual, distributed 12-second excerpts");
+            payload.put("windowsRequested", times.length);
+            payload.put("windowsRecognized", evidence.length());
             return payload;
         } finally {
             if (recognizer != null) recognizer.release();
