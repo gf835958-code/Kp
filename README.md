@@ -57,3 +57,12 @@ Do **not** call this feature complete until an end-to-end physical Android test 
 - CI run **43765728147** passed emulator instrumentation. The movie fixture contains synthetic spoken English: "The secret map is inside the red house. We must find the map." Whisper tiny decoded the source soundtrack on Android. The strengthened test asserted that the result contained "map" or "house", not merely arbitrary nonempty text. Burmese narration, MP4 tracks, and 30-minute native scene scan tests passed as well. https://github.com/gf835958-code/Kp/actions/runs/43765728147
 - The pinned multilingual Whisper INT8 encoder, decoder, and tokens SHA-256 checks are enforced by tools/fetch-asr-model.sh.
 - This validates short excerpts only, not multilingual-to-Burmese translation, accurate full-movie plot understanding, long-movie end-to-end export, or vivo V27. No full-featured APK is approved for distribution.
+
+## 2026-11-19: Offline spoken dialogue coverage and reliability update
+
+- Replaced three manually chosen scene timestamps with up to **six distributed, automatic 12-second audio samples** for a roughly 30-minute movie (up to 72 seconds of direct dialogue evidence). The entire movie stays local; samples are decoded one at a time rather than buffered in RAM.
+- Original spoken-language transcripts now retain individual timestamps and do not overwrite earlier excerpts from the same scene. **English and other non-Burmese dialogue is NOT falsely represented as Burmese translation.**
+- Whisper now skips near-silent decoded PCM samples and suppresses repeated normalized lines. A new Android emulator test uses real AAC silence to verify it doesn't fabricate text.
+- The one-click UI receives native per-window ASR progress updates so the user can see 0/N through N/N rather than a frozen screen.
+- JavaScript smoke tests cover the distributed sampling algorithm, deduplication/silence guard presence, and native progress bridge. Android build and instrumentation: [latest runs](https://github.com/gf835958-code/Kp/actions).
+- **Still missing**: trustworthy full-film plot understanding, arbitrary source-language to Burmese offline translation, and vivo V27 full-video end-to-end verification. A 6×12-second sample cannot summarize 30 minutes accurately by itself. Do not call this a full automated story recap or send the user experimental 100+ MB APKs repeatedly.
