@@ -90,7 +90,7 @@ public final class OneClickRecapUiInstrumentedTest {
             // selectedVideo still points to the real H264/AAC fixture.
             // The real one-click event handler, native scan, Whisper, ONNX
             // Burmese TTS, and Media3 export run unchanged.
-            String invoke = String.raw`(() => {
+            String invoke = """(() => {
               window.__kpUiE2e={stage:'started'};
               const original=window.onAutoExportResult;
               window.onAutoExportResult=(ok,message)=>{
@@ -102,7 +102,7 @@ public final class OneClickRecapUiInstrumentedTest {
               $('target').value='12';
               $('autoBtn').click();
               return 'one-click-started';
-            })()`;
+            })()""";
             String initiated = eval(scenario, invoke);
             assertTrue("Generate was not invoked: " + initiated,
                 initiated != null && initiated.contains("one-click-started"));
