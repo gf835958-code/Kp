@@ -7,12 +7,12 @@ adb install -r app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
 
 echo "[KP Recap] Running Burmese ONNX TTS + Media3 MP4 instrumentation"
 adb shell am instrument -w -r \
-  -e class com.kp.movierecap.NarratedRecapInstrumentedTest \
+  -e class com.kp.movierecap.NarratedRecapInstrumentedTest,com.kp.movierecap.OneClickRecapUiInstrumentedTest \
   com.kp.movierecap.test/androidx.test.runner.AndroidJUnitRunner \
   | tee /tmp/kp-emulator-test.log
 
 echo "[KP Recap] Checking instrumentation assertion summary"
-grep -E 'OK \(3 tests\)' /tmp/kp-emulator-test.log
+grep -E 'OK \(4 tests\)' /tmp/kp-emulator-test.log
 echo "[KP Recap] Pulling proof MP4 and WAV from Android private test cache"
 adb exec-out run-as com.kp.movierecap cat cache/kp_ci_narrated.mp4 > kp-emulator-narrated-proof.mp4
 adb exec-out run-as com.kp.movierecap cat cache/kp_burmese_voice.wav > kp-emulator-burmese-proof.wav
