@@ -65,6 +65,14 @@ jobs:
             -c:a aac -ar 16000 -af apad -movflags +faststart \
             app/src/androidTest/assets/kp-smoke.mp4
           test -s app/src/androidTest/assets/kp-smoke.mp4
+          # A true silent AAC soundtrack, not a no-audio movie.
+          ffmpeg -hide_banner -loglevel error -y \
+            -f lavfi -i color=c=black:s=128x72:r=2 \
+            -f lavfi -i anullsrc=channel_layout=mono:sample_rate=16000 \
+            -t 12 -shortest -c:v libx264 -pix_fmt yuv420p -r 2 -g 2 -crf 43 \
+            -c:a aac -b:a 24k -movflags +faststart \
+            app/src/androidTest/assets/kp-silence.mp4
+          test -s app/src/androidTest/assets/kp-silence.mp4
           # 30-minute movie fixture is generated on GitHub, not on the user's data plan.
           ffmpeg -hide_banner -loglevel error -y -f lavfi -i color=c=blue:s=128x72:r=1 \
             -t 1802 -c:v libx264 -preset ultrafast -pix_fmt yuv420p -r 1 -g 1 \
