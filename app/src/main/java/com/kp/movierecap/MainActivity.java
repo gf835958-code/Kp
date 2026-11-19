@@ -413,6 +413,13 @@ public final class MainActivity extends Activity {
         });
     }
 
+    private void reportNativeDialogueProgress(int done, int total) {
+        runOnUiThread(() -> {
+            if (webView != null) webView.evaluateJavascript(
+                "window.onNativeDialogueProgress(" + done + "," + total + ")", null);
+        });
+    }
+
     private int configureTts(String tag) {
         if (!ttsReady || tts == null) { feedback("ဖုန်းမှာ TTS Engine မရသေးပါ။"); return TextToSpeech.ERROR; }
         int status = tts.setLanguage(Locale.forLanguageTag(tag));
@@ -484,7 +491,8 @@ public final class MainActivity extends Activity {
                 io.execute(() -> {
                     try {
                         reportNativeDialogue(DialogueTranscriber.transcribe(
-                            MainActivity.this, source, timestamps), "");
+                            MainActivity.this, source, timestamps,
+                            (done, total) -> reportNativeDialogueProgress(done, total)), "");
                     } catch (Exception | UnsatisfiedLinkError err) {
                         reportNativeDialogue(null, "Dialogue ASR unavailable: " + err.getMessage());
                     }
