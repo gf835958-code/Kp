@@ -4,6 +4,8 @@ on:
     branches: [kp-movie-recap-app]
     paths:
       - 'app/src/androidTest/**'
+      - 'app/src/main/assets/index.html'
+      - 'app/src/main/java/com/kp/movierecap/MainActivity.java'
       - 'tools/run-android-emulator-smoke.sh'
       - 'app/src/main/java/com/kp/movierecap/NativeSceneScanner.java'
       - 'app/src/main/java/com/kp/movierecap/CaptionedVideoExporter.java'
