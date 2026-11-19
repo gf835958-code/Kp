@@ -35,6 +35,29 @@ public final class NarratedRecapInstrumentedTest {
      * WebView seeks time out when scanning a 30-minute MP4. This test exercises
      * real Android native frame extraction on an offline 1802-second H264 file.
      */
+    @Test public void speechRecognizerDoesNotInventWordsFromSilence() throws Exception {
+        Context target = InstrumentationRegistry.getInstrumentation().getTargetContext();
+        Context tester = InstrumentationRegistry.getInstrumentation().getContext();
+        File silent = new File(target.getCacheDir(), "kp_ci_silence.mp4");
+        try (InputStream in = tester.getAssets().open("kp-silence.mp4");
+             FileOutputStream out = new FileOutputStream(silent)) {
+            byte[] buffer = new byte[8192];
+            int n;
+            while ((n = in.read(buffer)) >= 0) if (n > 0) out.write(buffer, 0, n);
+        }
+        try {
+            assertTrue("Missing silent MP4 fixture", silent.length() > 1024);
+            org.json.JSONObject dialogue = DialogueTranscriber.transcribe(
+                target, Uri.fromFile(silent), new double[]{3.0, 7.0});
+            assertEquals("Whisper must not hallucinate dialogue on silent soundtrack", 0,
+                dialogue.getJSONArray("dialogues").length());
+            assertEquals("Silence windows still need correct audit count", 2,
+                dialogue.getInt("windowsRequested"));
+        } finally {
+            silent.delete();
+        }
+    }
+
     @Test public void scansThirtyMinuteVideoWithoutWebViewSeeking() throws Exception {
         Context target = InstrumentationRegistry.getInstrumentation().getTargetContext();
         Context runner = InstrumentationRegistry.getInstrumentation().getContext();
