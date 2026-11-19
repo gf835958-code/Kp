@@ -34,6 +34,18 @@ assert.equal(ctx.chooseDialogueTimes(NaN).length,0,'Invalid duration must not la
 assert.ok(script.includes('best.dialogueEvidenceList.push('),'Must preserve multiple source utterances');
 assert.ok(script.includes('Original speech'),'Display original dialogue evidence, not invented translations');
 
+ctx.visualDict={person:'လူ',house:'အိမ်'};
+vm.runInContext(functionSource('briefGroundedNarration'),ctx);
+const emptyNarration=ctx.briefGroundedNarration({labels:[],dialogueEvidenceList:[]});
+assert.ok(emptyNarration.length<60 && /[\u1000-\u109f]/.test(emptyNarration),
+  'Unknown image must not invent a movie plot or create a long caption');
+const grounded=ctx.briefGroundedNarration({
+  labels:[{label:'person',confidence:.9}],dialogueEvidenceList:[
+    {lang:'en',text:'I found a map, said John.'}
+  ]});
+assert.ok(grounded.includes('လူ') && !grounded.includes('John'),
+  'Non-Burmese speech must not be falsely narrated as a Burmese translation');
+assert.ok(script.includes('if(end-start>=5)'),'Tiny segments must not force truncated speech');
 const frames=Array.from({length:20},(_,i)=>({time:40+i*87,diff:i===0?1:i/22,thumb:'data:image/jpeg;base64,ABCD'}));
 const picks=ctx.chooseNativeScenes(frames,1802,10);
 assert.ok(picks.length>=2&&picks.length<=10,'Scene count');
