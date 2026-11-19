@@ -23,8 +23,17 @@ import java.util.Set;
 public final class DialogueTranscriber {
     private DialogueTranscriber() {}
 
+    public interface ProgressListener {
+        void onProgress(int completed, int total);
+    }
+
     public static JSONObject transcribe(Context context, Uri movie, double[] times)
             throws Exception {
+        return transcribe(context, movie, times, null);
+    }
+
+    public static JSONObject transcribe(Context context, Uri movie, double[] times,
+            ProgressListener progress) throws Exception {
         if (movie == null || times == null || times.length == 0 || times.length > 8)
             throw new IllegalArgumentException("Invalid movie dialogue windows");
         OfflineRecognizer recognizer = null;
@@ -49,6 +58,7 @@ public final class DialogueTranscriber {
             JSONArray evidence = new JSONArray();
             Set<String> seenText = new HashSet<>();
             for (int i = 0; i < times.length; i++) {
+                if (progress != null) progress.onProgress(i, times.length);
                 if (!Double.isFinite(times[i]) || times[i] < 0)
                     throw new IllegalArgumentException("Invalid timestamp");
                 long microseconds = Math.round(times[i] * 1000000.0);
@@ -89,6 +99,7 @@ public final class DialogueTranscriber {
                     stream.release();
                 }
             }
+            if (progress != null) progress.onProgress(times.length, times.length);
             JSONObject payload = new JSONObject();
             payload.put("dialogues", evidence);
             payload.put("method", "Whisper tiny multilingual, distributed 12-second excerpts");
