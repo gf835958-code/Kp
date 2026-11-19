@@ -77,6 +77,9 @@ assert.ok(fs.readFileSync('app/src/main/java/com/kp/movierecap/DialogueTranscrib
 const decoder=fs.readFileSync('app/src/main/java/com/kp/movierecap/DialogueTranscriber.java','utf8');
 assert.ok(decoder.includes('double rms = Math.sqrt('),'Silence gate missing');
 assert.ok(decoder.includes('seenText.add('),'ASR duplicate suppression missing');
+assert.ok(decoder.includes('ProgressListener progress'),'ASR progress callback missing');
+assert.ok(activity.includes('reportNativeDialogueProgress('),'Android progress bridge missing');
+assert.ok(script.includes('window.onNativeDialogueProgress='),'UI progress receiver missing');
 
 assert.ok(fs.readFileSync('app/src/main/java/com/kp/movierecap/MovieAudioSampler.java','utf8')
   .includes('MediaCodec.createDecoderByType'), 'Movie audio decoder missing');
