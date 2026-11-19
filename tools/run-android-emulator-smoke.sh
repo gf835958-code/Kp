@@ -12,7 +12,7 @@ adb shell am instrument -w -r \
   | tee /tmp/kp-emulator-test.log
 
 echo "[KP Recap] Checking instrumentation assertion summary"
-grep -E 'OK \(2 tests\)' /tmp/kp-emulator-test.log
+grep -E 'OK \(3 tests\)' /tmp/kp-emulator-test.log
 echo "[KP Recap] Pulling proof MP4 and WAV from Android private test cache"
 adb exec-out run-as com.kp.movierecap cat cache/kp_ci_narrated.mp4 > kp-emulator-narrated-proof.mp4
 adb exec-out run-as com.kp.movierecap cat cache/kp_burmese_voice.wav > kp-emulator-burmese-proof.wav
