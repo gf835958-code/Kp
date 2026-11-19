@@ -23,6 +23,17 @@ const fields={maxScenes:{value:'10'},target:{value:'4'},preview:{duration:NaN}};
 const ctx={shotList:[],lastNativeDuration:1802,$:id=>fields[id],Number,Math,Array,Error};
 vm.createContext(ctx);
 vm.runInContext(functionSource('chooseNativeScenes')+'\n'+functionSource('buildAutoClips'),ctx);
+vm.runInContext(functionSource('chooseDialogueTimes'),ctx);
+const dialogueWindows=ctx.chooseDialogueTimes(1802);
+assert.equal(dialogueWindows.length,6,'30-minute movie should sample six audio regions');
+assert.ok(dialogueWindows[0]>0 && dialogueWindows.at(-1)<1802,'Audio windows within movie');
+for(let i=1;i<dialogueWindows.length;i++)
+  assert.ok(dialogueWindows[i]-dialogueWindows[i-1]>100,'Audio evidence regions must cover film');
+assert.equal(ctx.chooseDialogueTimes(40).length,1,'Short movie should not waste Whisper inference');
+assert.equal(ctx.chooseDialogueTimes(NaN).length,0,'Invalid duration must not launch ASR');
+assert.ok(script.includes('best.dialogueEvidenceList.push('),'Must preserve multiple source utterances');
+assert.ok(script.includes('Original speech'),'Display original dialogue evidence, not invented translations');
+
 const frames=Array.from({length:20},(_,i)=>({time:40+i*87,diff:i===0?1:i/22,thumb:'data:image/jpeg;base64,ABCD'}));
 const picks=ctx.chooseNativeScenes(frames,1802,10);
 assert.ok(picks.length>=2&&picks.length<=10,'Scene count');
@@ -63,6 +74,10 @@ assert.ok(activity.includes('transcribeVideoNative('), 'Android dialogue bridge 
 assert.ok(script.includes('scanDialogueContext()'), 'Offline dialogue not connected to one-click scan');
 assert.ok(fs.readFileSync('app/src/main/java/com/kp/movierecap/DialogueTranscriber.java','utf8')
   .includes('new OfflineRecognizer('), 'On-device Whisper decoder missing');
+const decoder=fs.readFileSync('app/src/main/java/com/kp/movierecap/DialogueTranscriber.java','utf8');
+assert.ok(decoder.includes('double rms = Math.sqrt('),'Silence gate missing');
+assert.ok(decoder.includes('seenText.add('),'ASR duplicate suppression missing');
+
 assert.ok(fs.readFileSync('app/src/main/java/com/kp/movierecap/MovieAudioSampler.java','utf8')
   .includes('MediaCodec.createDecoderByType'), 'Movie audio decoder missing');
-console.log('PASS: JavaScript syntax, native 30min scene planning, offline Whisper dialogue bridge, narrated MP4 wiring');
+console.log('PASS: JavaScript syntax, native 30min scene planning, distributed dialogue coverage, silent-audio guard, narrated MP4 wiring');
