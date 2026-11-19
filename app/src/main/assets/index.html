@@ -226,6 +226,19 @@ function buildAutoClips(){
   }
   return clips;
 }
+function briefGroundedNarration(scene){
+  const original=Array.isArray(scene.dialogueEvidenceList) ?
+    scene.dialogueEvidenceList.find(x=>(x.lang==='my'||x.lang==='mya') &&
+      /[\u1000-\u109f]/.test(x.text||'')) : null;
+  // Only use original Burmese dialogue, not untranslated foreign text.
+  if(original)return String(original.text).trim().slice(0,48);
+  const names=[...new Set((scene.labels||[])
+    .filter(x=>Number(x.confidence)>=.55)
+    .map(x=>visualDict[String(x.label||'').toLowerCase()])
+    .filter(Boolean))].slice(0,2);
+  if(names.length)return 'ဒီမြင်ကွင်းမှာ '+names.join('၊ ')+' တွေ့ရနိုင်ပါတယ်။';
+  return 'မြင်ကွင်းတစ်ခု ပြောင်းလဲသွားပါတယ်။';
+}
 function buildAutoCaptionPlan(){
   // Keep scene descriptions aligned with retained, non-overlapping clip ranges.
   const duration=lastNativeDuration || Number($('preview').duration);
@@ -235,9 +248,9 @@ function buildAutoCaptionPlan(){
   for(const scene of shotList.slice(0,16)){
     const start=Math.max(endPrev,Math.max(0,scene.time-.65));
     const end=Math.min(duration,start+segmentLength);
-    if(end-start>.5) {
+    if(end-start>=5) {
       clips.push([start,end]);endPrev=end;
-      captions.push((scene.note||'').trim().replace(/\s+/g,' ').replace(/^\d{2}:\d{2}\s*/, '').slice(0,96));
+      captions.push(briefGroundedNarration(scene));
     }
   }
   return {clips,captions};
