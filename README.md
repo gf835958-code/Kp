@@ -66,3 +66,8 @@ Do **not** call this feature complete until an end-to-end physical Android test 
 - The one-click UI receives native per-window ASR progress updates so the user can see 0/N through N/N rather than a frozen screen.
 - JavaScript smoke tests cover the distributed sampling algorithm, deduplication/silence guard presence, and native progress bridge. Android build and instrumentation: [latest runs](https://github.com/gf835958-code/Kp/actions).
 - **Still missing**: trustworthy full-film plot understanding, arbitrary source-language to Burmese offline translation, and vivo V27 full-video end-to-end verification. A 6×12-second sample cannot summarize 30 minutes accurately by itself. Do not call this a full automated story recap or send the user experimental 100+ MB APKs repeatedly.
+
+## Verified 2026-11-19 dialogue regression results
+- **Android emulator runtime PASS (3 instrumented tests):** https://github.com/gf835958-code/Kp/actions/runs/44577266992 . This validates 1,802-second native scene scanning without WebView seeks, offline Burmese WAV speech + Media3 captioned MP4 with audio/video tracks, and actual decoded *silent AAC MP4* not generating fake Whisper dialogue.
+- **Latest native bridge / UI progress + 6-window selection JS and Java APK build PASS:** https://github.com/gf835958-code/Kp/actions/runs/44577436324 (source includes progress callbacks; Android emulator tests were run against a preceding compatible commit). The UI itself has **not** been end-to-end exercised by tapping Generate on vivo V27.
+- The compiled APK remains a 190 MB-class **experimental test build** and must not be presented as the finished one-click story-recap release. Still lacks actual accurate whole-film plot reasoning and offline all-language → Burmese translation.
