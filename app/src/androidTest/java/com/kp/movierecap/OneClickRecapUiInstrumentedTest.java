@@ -118,8 +118,8 @@ public final class OneClickRecapUiInstrumentedTest {
             }
             assertTrue("Generate did not finish: " + result,
                 result != null && result.contains("finished"));
-            assertTrue("One click reported failed MP4 export: " + result,
-                result.contains("\\\"ok\\\":true"));
+            assertEquals("One click reported failed MP4 export: " + result,
+                "true", eval(scenario, "window.__kpUiE2e && window.__kpUiE2e.ok===true"));
 
             // Success in JS means the app's MediaStore copy finished. Confirm
             // that the produced file exists rather than trusting callback alone.
