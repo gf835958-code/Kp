@@ -71,6 +71,12 @@ function scanNativeFrames(){
     catch(e){clearTimeout(timer);nativeScanResolve=null;reject(e);}
   });
 }
+window.onNativeDialogueProgress=(completed,total)=>{
+  if(!Number.isFinite(completed)||!Number.isFinite(total)||total<=0)return;
+  const done=Math.max(0,Math.min(total,completed));
+  setProgress(87+10*done/total,'Offline dialogue '+done+'/'+total);
+  if($('autoBtn').disabled)autoStatus('Original-language audio analysis '+done+'/'+total+'...');
+};
 window.onNativeDialogueResult=(payload,error)=>{
   if(nativeDialogueResolve){const cb=nativeDialogueResolve;nativeDialogueResolve=null;cb(payload,error||'');}
 };
