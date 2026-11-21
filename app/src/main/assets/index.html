@@ -174,7 +174,7 @@ function scanNativeFrames(){
 window.onNativeDialogueProgress=(completed,total)=>{
   if(!Number.isFinite(completed)||!Number.isFinite(total)||total<=0)return;
   const done=Math.max(0,Math.min(total,completed));
-  setProgress(87+10*done/total,'Offline dialogue '+done+'/'+total);
+  setProgress(62+18*done/total,'စကားပြောသံ '+done+'/'+total+' စစ်ပြီး');
   if($('autoBtn').disabled)autoStatus('Original-language audio analysis '+done+'/'+total+'...');
 };
 window.onNativeDialogueResult=(payload,error)=>{
@@ -254,18 +254,18 @@ function vector(ctx){const d=ctx.getImageData(0,0,24,14).data,out=[];for(let i=0
 function distance(a,b){if(!a||!b)return 1;let s=0;for(let i=0;i<a.length;i++)s+=Math.abs(a[i]-b[i]);return s/(a.length*255)}
 $('scanBtn').onclick=async()=>{if(busy)return;if(!currentFile){toast('Video File အရင်ရွေးပါ။');return}busy=true;$('scanBtn').disabled=true;$('scanBtn').textContent='Scanning video frames…';shotList=[];renderShots();let v=document.createElement('video');v.src=objectUrl;v.muted=true;v.preload='auto';v.playsInline=true;try{
 if(window.AndroidRecap && typeof AndroidRecap.scanVideoNative==='function' && !demoMode){
-  setProgress(12,'Android native video scan');
+  setProgress(8,'Video မြင်ကွင်းတွေ စစ်နေပါတယ်');
   const result=await scanNativeFrames();
   const dur=Number(result.duration);
   if(!Number.isFinite(dur)||dur<=0)throw Error('Invalid video duration');
   lastNativeDuration=dur;
   const picks=chooseNativeScenes(result.frames,dur,Number($('maxScenes').value)||10);
   shotList=picks.map(p=>({...p,labels:[],note:''}));
-  renderShots();setProgress(75,'Labeling representative images');
+  renderShots();setProgress(48,'မြင်ကွင်းထဲက အရာတွေ စစ်နေပါတယ်');
   await analyzeAllFrames();
-  setProgress(87,'Sampling real spoken dialogue offline');
+  setProgress(62,'Video အသံကို စစ်နေပါတယ်');
   await scanDialogueContext();
-  $('draft').click();setProgress(100,'Native scene scan complete');
+  $('draft').click();setProgress($('autoBtn').disabled?82:100,'မြင်ကွင်းနဲ့ အသံ စစ်ပြီးပါပြီ');
   toast(shotList.length+' frames scanned with Android native decoder.');
   return;
 }
@@ -360,6 +360,11 @@ function autoStatus(message,state='running'){
   notice.textContent=message;
   notice.dataset.state=state;
 }
+window.onNativeExportProgress=percent=>{
+  if(!Number.isFinite(percent))return;
+  const safe=Math.max(0,Math.min(99,percent));
+  setProgress(88+safe*.11,'MP4 Video ပေါင်းထုတ်နေပါတယ် '+Math.round(safe)+'%');
+};
 window.onAutoExportResult=(success,message)=>{
   autoStatus((success?'✅ ':'❌ ')+message,success?'success':'error');
   $('autoBtn').disabled=false;
@@ -400,6 +405,7 @@ $('autoBtn').onclick=async()=>{
   const clips=plan.clips;
   if(!clips.length) { $('autoBtn').disabled=false;$('autoBtn').textContent='✨ မြန်မာအသံ Video ဖန်တီးမယ်';return autoStatus('❌ အသံထည့်နိုင်မယ့် Video အပိုင်းမရှိပါ။ နောက် Video တစ်ခု စမ်းပါ။','error'); }
   autoStatus('🎬 မြန်မာအသံနဲ့ စာတန်းတွေကို Video ထဲ ပေါင်းထုတ်နေပါတယ်…','running');
+  setProgress(86,'မြန်မာအသံဖန်တီးပြီး MP4 ပေါင်းထုတ်နေပါတယ်');
   try {
     if(typeof AndroidRecap.exportCaptionedAuto==='function') {
       AndroidRecap.exportCaptionedAuto(JSON.stringify(clips),JSON.stringify(plan.captions));
