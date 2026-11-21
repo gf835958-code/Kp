@@ -2,7 +2,7 @@
 <html lang="my">
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#080b18"><meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#f7f8fd"><meta name="color-scheme" content="light">
 <title>KP Movie Recap • Studio</title>
 <style>
 /* System fonts only: offline */
@@ -13,27 +13,124 @@ body.show-advanced #advancedFields{display:grid}
 body.show-advanced main.workspace>.stack:first-child>section.card:not(:first-child),body.show-advanced main.workspace>.stack:nth-child(2){display:flex}
 body.show-advanced main.workspace>.stack:nth-child(2){flex-direction:column}
 body.show-advanced #scanBtn{display:block!important}
-.visualnote{min-height:54px;border:1px solid #303e5b;background:#101627;color:#d6e1fb;border-radius:8px;padding:8px;font-size:12px;line-height:1.7}</style>
+.visualnote{min-height:54px;border:1px solid #303e5b;background:#101627;color:#d6e1fb;border-radius:8px;padding:8px;font-size:12px;line-height:1.7}
+/* KP Friendly Studio v0.11 — calm mobile-first UI, offline fonts, legible Myanmar */
+:root{--bg:#f7f8fd;--panel:#fff;--line:#e4e8f4;--muted:#53637e;--txt:#182139;--p:#7360e9;--c:#177b84;--glow:rgba(115,96,233,.15)}
+html{color-scheme:light;scroll-behavior:smooth}
+body{background:radial-gradient(ellipse 65% 22% at 95% -7%,#e9e4ff 0%,transparent 90%),linear-gradient(180deg,#fbfaff,#f7f8fd 50%,#f4f8fa);color:var(--txt);font-family:'Noto Sans Myanmar',system-ui,-apple-system,sans-serif;font-size:15px;line-height:1.8}
+[hidden]{display:none!important}
+.app{max-width:990px;padding:0 18px 52px}
+header{padding:16px 0 14px;border-bottom:1px solid #e5e9f2}
+.brand{gap:12px}.icon{width:48px;height:48px;border-radius:17px;background:#e7e2ff;box-shadow:none;color:#5f46bc;font-size:26px}
+.brand b{font-size:17px;letter-spacing:-.4px;color:#212843}
+.brand small{font-size:11px;color:#697a92;letter-spacing:0}
+.pill{font-size:11px;letter-spacing:0;color:#146251;background:#e4f6ee;border-color:#bde6d1;font-weight:750;padding:6px 12px}
+.hero{padding:27px 0 23px;gap:11px}
+.eyebrow{font-size:12px;letter-spacing:.15px;color:#7560c9;font-weight:800}
+.hero h1{font-size:clamp(28px,5.1vw,43px);letter-spacing:-.7px;font-weight:850;line-height:1.55;color:#1d2342}
+.hero h1 span{background:linear-gradient(100deg,#6453c7,#167f86);color:transparent;background-clip:text}
+.hero p{max-width:680px;font-size:14px;color:#52647d;line-height:1.9}
+.flow-steps{display:flex;align-items:center;flex-wrap:wrap;gap:7px;margin-top:7px}
+.flow-steps span:not(.flow-arrow){display:inline-flex;align-items:center;gap:7px;padding:5px 11px;border-radius:50px;background:#fff;border:1px solid #e3e6f2;color:#34415c;font-size:12px;font-weight:700}
+.flow-steps span b{display:grid;place-items:center;background:#e9e5fc;color:#6650c7;width:22px;height:22px;border-radius:50%;font-size:12px}
+.flow-steps .flow-arrow{font-size:20px;color:#8995af;font-weight:800}
+.workspace{grid-template-columns:minmax(0,1.1fr) minmax(300px,.9fr);gap:18px}
+.stack{gap:16px}
+.card{padding:21px;border:1px solid #e3e7f1;border-radius:22px;background:#fff;box-shadow:0 10px 30px rgba(34,39,83,.05)}
+.card h2{font-size:17px;font-weight:800;line-height:1.6;color:#1a2948;margin-bottom:4px}
+.card .sub{font-size:13px;line-height:1.75;color:#5e6d86;margin-bottom:15px}
+.step{background:#eee9ff;color:#6549b7;font-size:13px;width:29px;height:29px;border-radius:10px}
+.drop{padding:25px 18px;border:2px dashed #b9abea;border-radius:20px;background:linear-gradient(135deg,#f8f5ff,#f0fafb);transition:background .2s,border-color .2s}
+.drop:hover,.drop.drag,.drop:focus-visible{background:#f1edff;border-color:#735bdd}
+.uploadpic{width:62px;height:62px;border-radius:21px;background:#e9e3ff;font-size:30px;margin-bottom:11px}
+.drop strong{font-size:16px;line-height:1.7;font-weight:800;color:#293454}
+.drop small{font-size:12px;color:#64748e;margin-bottom:14px}
+.btn{min-height:47px;box-shadow:none;padding:12px 17px;border-radius:14px;background:#7160df;color:#fff;font-size:14px;line-height:1.6;font-weight:800}
+.btn.alt{background:#f6f6fd;color:#5446a1;border:1px solid #dadcf3}
+.btn.teal{background:#1a808b}
+.btn.small{font-size:13px;min-height:43px}
+.btn:hover:not(:disabled){filter:brightness(.98);transform:translateY(-1px)}
+button:disabled{opacity:.58}
+.choose-video{background:#6653cd;padding:11px 23px;min-height:48px}
+.primary-action{display:block;width:100%;margin-top:15px;padding:16px 12px;min-height:61px;border-radius:17px;font-size:16px;font-weight:850;line-height:1.7;background:linear-gradient(115deg,#7460e9,#5758cd);box-shadow:0 9px 23px rgba(106,84,212,.19)}
+.status-message{margin-top:15px!important;padding:13px 15px;font-size:13px;line-height:1.85;background:#f3f4ff;color:#405070;border:1px solid #e2e5fc;border-radius:14px}
+.status-message[data-state="running"]{background:#f0f8fe;color:#24496c;border-color:#cfe6f9}
+.status-message[data-state="success"]{background:#ebfaf1;color:#22654a;border-color:#c1e6d4}
+.status-message[data-state="error"]{background:#fff0f0;color:#8a3838;border-color:#f3d1d1}
+#progress{margin:14px 0 0}
+.bar{height:10px;border-radius:99px;background:#eaeef8}
+.bar i{background:linear-gradient(90deg,#8471f1,#3fa6a7);border-radius:99px}
+.progress-label{font-size:12px;color:#48607b;padding-top:5px}
+.advanced-toggle{margin-top:12px;width:100%;background:#fff!important;border:1px solid #e6e9f3!important;color:#52617a!important;text-align:center}
+.export-result{margin-top:17px;border:1px solid #bce5d1;background:#f0fbf5;padding:16px;border-radius:19px;display:grid;grid-template-columns:35px 1fr;gap:9px;align-items:start}
+.result-symbol{width:35px;height:35px;border-radius:50%;display:grid;place-items:center;background:#1e9368;color:white;font-size:20px;font-weight:800}
+.result-content b{font-size:15px;color:#145a43}.result-content p{font-size:12px;margin:4px 0;color:#39705b}
+.export-result .open-video{grid-column:1/-1;background:#197c61;margin-top:4px}
+.honesty-note{background:#faf9ff;border:1px solid #e9e2fa;border-radius:12px;padding:11px 13px;font-size:12px;color:#5c6084;line-height:1.9}
+.honesty-note strong{color:#5944a5}.hint em{color:#3a746b}
+.video-wrap{background:#eef0f8;border-color:#dce2ee;border-radius:15px}.meta{font-size:12px;color:#53637c;background:white}
+.field label{color:#465572;font-size:12px;font-weight:750}
+.field select{border:1px solid #d9dfed;background:#fff;color:#26324d;font-size:14px;border-radius:12px;padding:11px}
+.stat span{color:#536381;background:#f2f5fb;border-color:#e1e6f1;font-size:12px}
+.scenes{max-height:480px}
+.scene{background:#f8f9fd;border-color:#e4e9f1}.scene small{color:#497481;font-size:11px}.visualnote,.scene textarea{color:#394960;background:#fff;border-color:#e1e7f1;font-size:13px}
+.empty{border-color:#dce3f2;color:#64758d;font-size:13px;background:#fbfcff}
+.editor{background:#fbfcff;border-color:#dce2f0;color:#25344e;font-size:14px;line-height:1.9}
+.notice{background:#f4f7fa;border-color:#dde4ed;color:#53627d;font-size:12px}
+.notice b{color:#266e72}
+.future{background:#f9f7ff;border-color:#e8e0f4;color:#5c6079}
+.future b{color:#6050a6}
+.roadmap li{color:#51627d;border-color:#e5e9f0;font-size:12px}
+.roadmap li.later:before{color:#8d77da}
+.footer{color:#7b889d;font-size:11px}
+#toast{background:#2c2d49;color:#fff;font-size:13px;bottom:calc(18px + env(safe-area-inset-bottom));padding:12px 16px}
+.btn:focus-visible,.drop:focus-visible,textarea:focus-visible,input:focus-visible,select:focus-visible{outline:3px solid #a296f5;outline-offset:2px}
+@media(max-width:760px){
+  .app{padding:0 14px 60px}
+  .workspace{grid-template-columns:minmax(0,1fr);gap:15px}
+  .hero{padding:26px 0 21px}.hero h1{font-size:30px;line-height:1.6}
+  .hero p{font-size:13px}
+  .card{padding:18px 16px;border-radius:20px}
+  .brand b{font-size:15px}.brand small{font-size:10px}
+  .pill{font-size:10px;padding:5px 8px}
+}
+@media(max-width:380px){
+  .flow-steps{gap:3px}.flow-steps span:not(.flow-arrow){padding:4px 7px;font-size:11px}
+  .flow-steps span b{width:19px;height:19px}
+  .fields{grid-template-columns:1fr}
+}
+@media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}.bar i,.drop,.btn{transition:none!important}}
+</style>
 </head>
 <body>
 <div class="app">
-<header><div class="brand"><div class="icon">🎬</div><div><b>KP MOVIE RECAP</b><small>OFFLINE VIDEO STUDIO</small></div></div><span class="pill">◉ ANDROID MVP v0.10</span></header>
-<section class="hero"><div class="eyebrow">✦ Android-first • Private by default</div><h1>Movie ထည့်မယ်။<br><span>Recap ကို ဖန်တီးမယ်။</span></h1><p>Video ရွေးပြီး Generate တစ်ချက်နှိပ်ပါ။ Auto Scene Labels ကို MP4 Video ထဲ မြင်ရတဲ့စာတန်းအဖြစ် ထည့်ပေးနိုင်အောင် ပြင်ထားပါတယ်။ ဇာတ်လမ်းကို နားလည်ပြီး မြန်မာအသံနဲ့ ပြောတဲ့ Full Recap မဟုတ်သေးပါ။</p></section>
+<header><div class="brand"><div class="icon" aria-hidden="true">🎞️</div><div><b>KP Movie Recap</b><small>မြန်မာ Video Studio</small></div></div><span class="pill">● Offline • ကိုယ်ပိုင်</span></header>
+<section class="hero">
+ <div class="eyebrow">✨ သုံးရလွယ်တဲ့ Video Studio</div>
+ <h1>ဗီဒီယိုရွေးပါ။<br><span>တစ်ချက်နှိပ်ပြီး ဖန်တီးပါ။</span></h1>
+ <p>Video ထဲက မြင်ကွင်းအချို့ကို ရွေးပြီး မြန်မာအသံနဲ့ စာတန်းပါတဲ့ MP4 ဖန်တီးပေးမယ်။ ဖိုင်တွေကို ဖုန်းထဲမှာပဲ ကိုင်တွယ်ပါတယ်။</p>
+ <div class="flow-steps" aria-label="အဆင့် ၃ ဆင့်"><span><b>၁</b> Video ရွေး</span><span class="flow-arrow" aria-hidden="true">›</span><span><b>၂</b> ဖန်တီး</span><span class="flow-arrow" aria-hidden="true">›</span><span><b>၃</b> MP4 ကြည့်</span></div>
+ </section>
 <main class="workspace">
 <div class="stack">
-<section class="card"><h2><span class="step">01</span> Video Import</h2><p class="sub">Video ကို ဖုန်းထဲမှာပဲ ဖွင့်ကြည့်နိုင်ပါတယ်။ Server ကို မတင်ပါ။</p><div id="drop" class="drop" tabindex="0" role="button" aria-label="Choose video file"><div class="uploadpic">⇧</div><strong>Movie Video တစ်ခု ရွေးပါ</strong><small>MP4 / WebM / Device-supported video formats</small><button class="btn" id="choose">＋ Choose Video</button></div><input type="file" id="file" accept="video/*"><div class="video-wrap" id="videoWrap"><video controls playsinline id="preview"></video><div class="meta" id="fileMeta"></div></div><div class="fields" id="advancedFields"><div class="field"><label for="lang">Script Language</label><select id="lang"><option value="my">🇲🇲 မြန်မာ</option><option value="en">🇬🇧 English</option></select></div><div class="field"><label for="ratio">Output Frame</label><select id="ratio"><option>Original (no crop)</option></select></div><div class="field"><label for="maxScenes">Maximum Scenes</label><select id="maxScenes"><option value="6">6 scenes • Quick</option><option value="10" selected>10 scenes • Standard</option><option value="16">16 scenes • Detailed</option></select></div><div class="field"><label for="target">Highlight Clip Length</label><select id="target"><option value="8">8 Seconds</option><option value="12" selected>12 Seconds</option><option value="15">15 Seconds</option></select></div></div><button id="scanBtn" class="btn teal" style="display:none;width:100%">✦ Scan Video Scenes</button><button id="autoBtn" class="btn" style="margin-top:10px;width:100%;font-size:17px;padding:17px">⚡ Generate Video — One Click</button>
-<div id="autoStatus" role="status" class="notice" style="margin-top:15px">Ready — Video ရွေးပြီး Generate Video နှိပ်ပါ။</div>
-<button id="detailsToggle" class="btn alt small" style="margin-top:12px;width:100%">Show Advanced Details</button><div id="progress"><div class="bar"><i id="progBar"></i></div><div id="progTxt" class="progress-label">Scanning…</div></div><p class="hint">MP4 ကို Movies/KP Movie Recap/ ထဲ သိမ်းပါမယ်။ <em>ဒီစမ်းသပ် Version မှာ မြင်ကွင်းစာတန်းအလိုက် မြန်မာအသံနဲ့ MP4 ထုတ်ရန် Code ပါတယ်။ ဇာတ်လမ်းအပြည့် နားလည်နိုင်တဲ့ AI မပါသေးပါ။</em></p></section>
-<section class="card"><h2><span class="step">02</span> Scene Timeline</h2><p class="sub">AI မြင်ကွင်းထဲရှိ အရာဝတ္ထုတွေကို အလိုအလျောက် ခွဲခြားပါမယ်။ ဇာတ်လမ်းအပြည့် နားလည်ခြင်းတော့ မဟုတ်သေးပါ။</p><div class="stat" id="stats"><span>Scenes: 0</span><span>Ready to scan</span></div><div class="scenes" id="scenes"><div class="empty">🎞️<br>Video Scan လုပ်ပြီးရင် Scene Timeline ဒီမှာ ပေါ်ပါမယ်။</div></div></section>
+<section class="card"><h2><span class="step">1</span> Video ရွေးပါ</h2><p class="sub">ဖုန်းထဲက Video ကိုရွေးပါ။ Cloud ပေါ် မတင်ပါ။</p><div id="drop" class="drop" tabindex="0" role="button" aria-label="ဖုန်းထဲမှ Video ရွေးရန်"><div class="uploadpic" aria-hidden="true">📂</div><strong>ဒီနေရာကနေ Video ရွေးပါ</strong><small>MP4 နှင့် ဖုန်းက ဖွင့်နိုင်တဲ့ Video ဖိုင်များ</small><button class="btn choose-video" id="choose">＋ Video ရွေးမယ်</button></div><input type="file" id="file" accept="video/*"><div class="video-wrap" id="videoWrap"><video controls playsinline id="preview"></video><div class="meta" id="fileMeta"></div></div><div class="fields" id="advancedFields"><div class="field"><label for="lang">Script Language</label><select id="lang"><option value="my">🇲🇲 မြန်မာ</option><option value="en">🇬🇧 English</option></select></div><div class="field"><label for="ratio">Output Frame</label><select id="ratio"><option>Original (no crop)</option></select></div><div class="field"><label for="maxScenes">Maximum Scenes</label><select id="maxScenes"><option value="6">6 scenes • Quick</option><option value="10" selected>10 scenes • Standard</option><option value="16">16 scenes • Detailed</option></select></div><div class="field"><label for="target">Highlight Clip Length</label><select id="target"><option value="8">8 Seconds</option><option value="12" selected>12 Seconds</option><option value="15">15 Seconds</option></select></div></div><button id="scanBtn" class="btn teal" style="display:none;width:100%">✦ Scan Video Scenes</button><button id="autoBtn" class="btn primary-action" type="button">✨ မြန်မာအသံ Video ဖန်တီးမယ်</button>
+<div id="autoStatus" role="status" aria-live="polite" class="notice status-message" data-state="ready">👆 Video ရွေးပြီး အပေါ်က ခလုတ်ကို နှိပ်ပါ။</div>
+ <section class="export-result" id="exportResult" hidden aria-live="polite">
+  <div class="result-symbol" aria-hidden="true">✓</div>
+  <div class="result-content"><b>Video ကို သိမ်းပြီးပါပြီ!</b><p>ဖုန်း Files → Movies → KP Movie Recap ထဲမှာ ရှိပါတယ်။</p></div>
+  <button id="openVideo" type="button" class="btn open-video">▶ ဖွင့်ကြည့်မယ်</button>
+ </section>
+<button id="detailsToggle" class="btn alt small advanced-toggle" type="button" aria-expanded="false">⚙️ အသေးစိတ်ကြည့်ရန် ▾</button><div id="progress" role="group" aria-label="Video ဖန်တီးမှု အခြေအနေ"><div class="bar"><i id="progBar"></i></div><div id="progTxt" class="progress-label" aria-live="polite">စစ်ဆေးနေပါတယ်…</div></div><p class="hint honesty-note">ℹ️ <strong>လက်ရှိ စမ်းသပ် Version</strong> က မြင်ကွင်းအချက်အလက်တွေကို ဖော်ပြနိုင်ပါတယ်။ ဇာတ်လမ်းတစ်ကားလုံးကို နားလည်ပြီး မှန်ကန်တဲ့ Recap ရေးတဲ့ AI မပြီးသေးပါ။</p></section>
+<section class="card"><h2><span class="step">2</span> မြင်ကွင်းများ</h2><p class="sub">AI မြင်ကွင်းထဲရှိ အရာဝတ္ထုတွေကို အလိုအလျောက် ခွဲခြားပါမယ်။ ဇာတ်လမ်းအပြည့် နားလည်ခြင်းတော့ မဟုတ်သေးပါ။</p><div class="stat" id="stats"><span>Scenes: 0</span><span>Ready to scan</span></div><div class="scenes" id="scenes"><div class="empty">🎞️<br>Video Scan လုပ်ပြီးရင် Scene Timeline ဒီမှာ ပေါ်ပါမယ်။</div></div></section>
 </div>
 <div class="stack">
-<section class="card"><h2><span class="step">03</span> Recap Script</h2><p class="sub">Image Labeling ရလဒ်ကနေ Scene Observations တွေကို Auto ဖော်ပြပါတယ်။ ဇာတ်ကြောင်းကို ဖန်တီးမထားပါ။</p><button class="btn" id="draft" style="width:100%;margin-bottom:12px">🧠 Auto Visual Summary</button><textarea class="editor" id="script" spellcheck="false" placeholder="Video ကို Scan လုပ်လိုက်ရင် Visual Summary အလိုအလျောက် ပေါ်လာပါမယ်။"></textarea><p class="hint">ML Kit Image Labeling သည် မြင်ရသောအရာတွေကိုသာ ခန့်မှန်းပါတယ်။ ဇာတ်ကောင်၊ ဆက်စပ်ဇာတ်ကြောင်း၊ မျက်နှာမမြင်ရသော အဖြစ်အပျက်များကို မသိနိုင်ပါ။</p></section>
-<section class="card"><h2><span class="step">04</span> Voice & Subtitles</h2><p class="sub">Burmese TTS Model မထည့်ရသေးပါ။ English device TTS ရရှိနိုင်ပေမယ့် မြန်မာအသံက သီးခြား Engine လိုအပ်နိုင်ပါတယ်။</p><div class="linebtns"><button class="btn alt" id="speak">▶ Voice Preview</button><button class="btn alt" id="stop">■ Stop Voice</button></div><p class="hint">မြန်မာ TTS သီးသန့် Model မပါသေးတာကြောင့် မြန်မာအသံကို အာမခံမထားပါ။ Unsupported ဆိုရင် English အသံနဲ့ မြန်မာစာ မဖတ်ခိုင်းပါ။</p></section>
-<section class="card"><h2><span class="step">05</span> Export Files</h2><p class="sub">Script, SRT, ရွေးထားတဲ့ Scene Highlight MP4 နဲ့ TTS Voice File (Android) ထုတ်နိုင်ပါတယ်။</p><div class="exports"><button class="btn alt" id="txt">↓ Script .TXT</button><button class="btn alt" id="srt">↓ Subtitle .SRT</button></div><div class="exports"><button class="btn teal" id="mp4">🎞️ Scene MP4</button><button class="btn alt" id="voice">🎙️ Voice File</button></div><div class="future"><b>🎞️ MP4 Highlight Export</b><div>Android App မှာ Scan လုပ်ပြီး Scene နားက Video Highlight တွေကို မူရင်းအသံနဲ့ MP4 အဖြစ် အပိုင်းဆက်နိုင်ပါတယ်။ AI ဇာတ်လမ်းနားလည်မှု၊ Voice ပေါင်းထည့်ခြင်းနဲ့ Burn-in Subtitle မပါသေးပါ။ Browser Preview မှာ MP4 Export မရပါ။ Voice File က Device TTS Engine အပေါ်မူတည်ပါတယ်။</div></div></section>
-<section class="card"><h2>🚀 Development Roadmap</h2><ul class="roadmap"><li>Video Import & Preview</li><li>Scene Frame Scan (basic)</li><li>Editable Script + SRT Download</li><li class="later">Offline AI Movie Understanding</li><li class="later">Burmese Voice Generation & Sync</li><li>Native Android Scene MP4 Highlight Export (rough-cut)</li><li class="later">Voice narration / speech-aligned subtitle sync</li><li>Native Android WebView + file picker</li></ul></section>
+<section class="card"><h2><span class="step">3</span> စာသားမှတ်တမ်း</h2><p class="sub">Image Labeling ရလဒ်ကနေ Scene Observations တွေကို Auto ဖော်ပြပါတယ်။ ဇာတ်ကြောင်းကို ဖန်တီးမထားပါ။</p><button class="btn" id="draft" style="width:100%;margin-bottom:12px">🧠 Auto Visual Summary</button><textarea class="editor" id="script" spellcheck="false" placeholder="Video ကို Scan လုပ်လိုက်ရင် Visual Summary အလိုအလျောက် ပေါ်လာပါမယ်။"></textarea><p class="hint">ML Kit Image Labeling သည် မြင်ရသောအရာတွေကိုသာ ခန့်မှန်းပါတယ်။ ဇာတ်ကောင်၊ ဆက်စပ်ဇာတ်ကြောင်း၊ မျက်နှာမမြင်ရသော အဖြစ်အပျက်များကို မသိနိုင်ပါ။</p></section>
+<section class="card"><h2><span class="step">4</span> အသံနဲ့ Subtitle</h2><p class="sub">အလိုအလျောက် MP4 Export မှာ Offline မြန်မာ ONNX အသံကို သုံးပါတယ်။ အောက်က Voice Preview ခလုတ်ကတော့ ဖုန်းရဲ့ System TTS ကို သုံးပါတယ်။</p><div class="linebtns"><button class="btn alt" id="speak">▶ Voice Preview</button><button class="btn alt" id="stop">■ Stop Voice</button></div><p class="hint">မြန်မာအသံ အလိုအလျောက် Video ထုတ်ခြင်းနဲ့ ဒီ Preview ခလုတ်က အသံထုတ်တဲ့ Engine မတူပါတယ်။</p></section>
+<section class="card"><h2><span class="step">5</span> အခြား ဖိုင်များ</h2><p class="sub">Script, SRT, ရွေးထားတဲ့ Scene Highlight MP4 နဲ့ TTS Voice File (Android) ထုတ်နိုင်ပါတယ်။</p><div class="exports"><button class="btn alt" id="txt">↓ Script .TXT</button><button class="btn alt" id="srt">↓ Subtitle .SRT</button></div><div class="exports"><button class="btn teal" id="mp4">🎞️ Scene MP4</button><button class="btn alt" id="voice">🎙️ Voice File</button></div><div class="future"><b>ℹ️ ဖိုင်အမျိုးအစားများ</b><div>အဓိက Generate ခလုတ်က မြန်မာအသံနဲ့ Scene စာတန်းပါတဲ့ MP4 ထုတ်ရန် ဖြစ်ပါတယ်။ အောက်က အပို Export များက Script၊ SRT၊ မူရင်းအသံပါ Scene Clip နဲ့ System TTS Voice ဖိုင်များ ဖြစ်ပါတယ်။</div></div></section>
+<section class="card"><h2>🚀 Development Roadmap</h2><ul class="roadmap"><li>Video Import & Preview</li><li>Scene Frame Scan (basic)</li><li>Editable Script + SRT Download</li><li class="later">Offline AI Movie Understanding</li><li>Burmese voice and scene-based captions (experimental)</li><li>Native Android Scene MP4 Highlight Export (rough-cut)</li><li class="later">Word-level subtitle/voice timing</li><li>Native Android WebView + file picker</li></ul></section>
 <div class="notice"><b>🛡️ Privacy & rights</b><div>Video ဖိုင်ကို ဒီ Prototype က Server ပေါ်မပို့ပါ။ ကိုယ်ပိုင် သို့မဟုတ် အသုံးပြုခွင့်ရှိသော Video များကိုသာ Recap အဖြစ် ထုတ်ဝေပါ။</div></div>
 </div>
-</main><div class="footer">KP Movie Recap Studio • Android MVP v0.6 • No cloud upload</div></div>
+</main><div class="footer">KP Movie Recap Studio • Offline Studio v0.11 • No cloud upload</div></div>
 <div id="toast" role="status"></div>
 <script>
 const $=id=>document.getElementById(id);let currentFile=null,objectUrl=null,shotList=[],busy=false,demoMode=false;let labelWaiters=new Map();let lastNativeDuration=0;let nativeScanResolve=null;let nativeDialogueResolve=null;
