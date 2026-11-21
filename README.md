@@ -96,3 +96,11 @@ Do **not** call this feature complete until an end-to-end physical Android test 
 - Compact mobile-first UX now scrolls to the one-click Generate action after importing a video.
 - Confirmed original three-step **Burmese mobile WebView** appears in a native Android emulator screenshot/render. Test artifact is **not** real vivo V27 validation.
 - Previous tested Android artifact verifies only **short synthetic clips**. Full-film plot comprehension and multilingual-to-Burmese neural translation are **still not implemented**; the existing app produces scene-grounded observations. Do **not** label this prototype a completed full movie recap release or pretend Whisper sparse transcripts solve storytelling. Newer CI runs after source/preflight changes must be checked separately.
+
+## 2026-11-22 — cancellation and safe output, Android build verified
+- Android WebView's simple **Generate** flow now provides a real **Cancel** button while scene scanning or media export runs. A scan cancelled before the MP4 phase must never launch an export; a running Media3 Transformer can be cancelled via the native bridge.
+- Each source-independent export receives a unique MP4 scratch path and WAV speech path so cancelled jobs cannot overwrite the next job's narration.
+- Cancellation or invalid input must not publish a partial MP4; only files with genuine video and audio tracks can be saved as completed output. Video picker is disabled while a job runs.
+- Android emulator runner now executes the **one-click UI test independently from four speech/video/preflight tests**, avoiding a previously observed emulator disconnection when all five ran in the same instrumentation process. A separate run's pass is still required; code presence is not a passed test.
+- **APK build verified PASS** on [44942357391](https://github.com/gf835958-code/Kp/actions/runs/44942357391); new Android emulator smoke run: [44942357383](https://github.com/gf835958-code/Kp/actions/runs/44942357383).
+- **Major missing functionality remains unchanged:** trustworthy full movie semantic plot reasoning, reliable all-language-to-Burmese neural translation, phoneme/word-level sync, real full-film and physical vivo V27 stress tests, and appropriately licensed distribution signing. Do not call v0.11 a complete full-auto story recap.
