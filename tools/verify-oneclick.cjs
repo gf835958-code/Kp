@@ -79,6 +79,14 @@ assert.ok(scanner.includes('MediaMetadataRetriever'),'Native frame reader missin
 assert.ok(activity.includes('Environment.DIRECTORY_MOVIES'),'Automatic file save missing');
 assert.ok(activity.includes('exportCaptionedAuto('), 'Captions bridge missing');
 assert.ok(activity.includes('saveCaptionedToMovies('), 'Caption MP4 auto-save missing');
+const preflight=fs.readFileSync('app/src/main/java/com/kp/movierecap/MovieExportPreflight.java','utf8');
+assert.ok(activity.includes('MovieExportPreflight.verify('),
+  'One-click export must validate source video and storage before offline TTS');
+assert.ok(preflight.includes('METADATA_KEY_VIDEO_WIDTH') &&
+  preflight.includes('getAvailableBytes()'),
+  'Preflight must validate the selected video and available storage');
+assert.ok(!activity.includes('ranges.sort(Comparator.comparingLong'),
+  'Sorting video ranges without matching captions would cause wrong narration');
 assert.ok(script.includes('AndroidRecap.exportCaptionedAuto('), 'UI not connected to caption exporter');
 assert.ok(script.includes('buildAutoCaptionPlan()'), 'Caption/clip alignment missing');
 const captioned=fs.readFileSync('app/src/main/java/com/kp/movierecap/CaptionedVideoExporter.java','utf8');
