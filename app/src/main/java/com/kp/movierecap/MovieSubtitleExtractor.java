@@ -98,7 +98,7 @@ public final class MovieSubtitleExtractor {
             offset = 2;
         }
         String text = new String(bytes, offset, count, StandardCharsets.UTF_8)
-            .replace("\uFEFF", "")
+            .replace(String.valueOf((char) 0xFEFF), "")
             .replaceAll("(?m)^WEBVTT.*$", "")
             .replaceAll("(?m)^\\s*\\d+\\s*$", "")
             .replaceAll("(?m)^.*?-->.*$", "")
@@ -106,7 +106,7 @@ public final class MovieSubtitleExtractor {
             .replace("&amp;", "&")
             .replace("&lt;", "<")
             .replace("&gt;", ">")
-            .replace('\\u0000', ' ')
+            .replace((char) 0, ' ')
             .replaceAll("[\\r\\n\\t]+", " ")
             .replaceAll(" {2,}", " ")
             .trim();
