@@ -77,3 +77,13 @@ Do **not** call this feature complete until an end-to-end physical Android test 
 - The source has since added `briefGroundedNarration()` to keep spoken Burmese scene captions short enough for scene segments and avoid pretending untranslated English dialogue is Burmese. This produces **visual descriptions, not a coherent full-movie story**.
 - A passing emulator one-click test is **not a physical vivo V27 guarantee**. No 438.9MB real-movie end-to-end test has passed. User's acceptance criteria remain unmet: accurate full-film story reasoning, multilingual translation to Burmese, and reliable long-video output.
 - **Distribution policy:** Don't push another ~190MB experimental APK to the user's mobile data plan as a finished result. All build, test, and proof artifacts stay on GitHub until a full release is ready.
+
+## 2026-11-21 — v0.11 friendly Burmese UI and real render-progress milestone
+- Rebuilt the app's Android WebView interface as an accessible, responsive **soft-light Burmese studio** with one obvious flow: **၁ Video ရွေး → ၂ ဖန်တီး → ၃ MP4 ကြည့်**.
+- The important Generate action appears directly below the video picker (above the preview). Advanced scene settings, transcript evidence and TXT/SRT options remain available behind **အသေးစိတ်ကြည့်ရန်**, not deleted.
+- Included meaningful on-screen status for import, scanning, real speech-transcription counts, media rendering and completion. MP4 progress comes from **Media3 Transformer.getProgress**, not a synthetic timer. A scan ending no longer claims the overall one-click export has reached 100%.
+- After confirmed MediaStore save, a dedicated result card appears with **ဖွင့်ကြည့်မယ်** to open only the last MP4 created by the app via an Android native content URI. No externally supplied URL or path is accepted.
+- UI color/system bars use a consistent light theme; Burmese readable typography, 47px+ buttons, strong focus rings, simple three-step onboarding. Added UI static tests, Android emulator visual screenshot capture, and nonblank screenshot verification.
+- The prior v0.11 code build with one-click UI **passed** https://github.com/gf835958-code/Kp/actions/runs/44916604308 . More recent UI progress and screenshot changes require their own GitHub build + emulator QA; don't infer success from an older run.
+- **This still is not an accurate full movie recap release.** Local image labels and sparse Whisper excerpts lack real plot reasoning and multilingual Myanmar translation; the user also requires successful on-device testing with a full-length movie on vivo V27.
+- Complete requirements and no-compromise release gates: [docs/KP-MOVIE-RECAP-REQUIREMENTS.md](docs/KP-MOVIE-RECAP-REQUIREMENTS.md). Do not call an experimental APK "final".
