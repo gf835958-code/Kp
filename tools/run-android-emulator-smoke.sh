@@ -18,4 +18,8 @@ adb exec-out run-as com.kp.movierecap cat cache/kp_ci_narrated.mp4 > kp-emulator
 adb exec-out run-as com.kp.movierecap cat cache/kp_burmese_voice.wav > kp-emulator-burmese-proof.wav
 test -s kp-emulator-narrated-proof.mp4
 test -s kp-emulator-burmese-proof.wav
+if adb shell run-as com.kp.movierecap ls cache/kp_friendly_studio_ui.png >/dev/null 2>&1; then
+  adb exec-out run-as com.kp.movierecap cat cache/kp_friendly_studio_ui.png > kp-friendly-ui-screen.png
+  test -s kp-friendly-ui-screen.png
+fi
 echo "[KP Recap] PASS: emulator produced and validated narrated MP4"
