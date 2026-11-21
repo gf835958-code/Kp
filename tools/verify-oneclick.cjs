@@ -31,8 +31,17 @@ for(let i=1;i<dialogueWindows.length;i++)
   assert.ok(dialogueWindows[i]-dialogueWindows[i-1]>100,'Audio evidence regions must cover film');
 assert.equal(ctx.chooseDialogueTimes(40).length,1,'Short movie should not waste Whisper inference');
 assert.equal(ctx.chooseDialogueTimes(NaN).length,0,'Invalid duration must not launch ASR');
-assert.ok(script.includes('best.dialogueEvidenceList.push('),'Must preserve multiple source utterances');
-assert.ok(script.includes('Original speech'),'Display original dialogue evidence, not invented translations');
+assert.ok(script.includes('best.dialogueEvidenceList.push('),'Must preserve verified scene speech quotes');
+assert.ok(script.includes('Original soundtrack excerpts'),'Keep the original soundtrack evidence separate from Burmese recap');
+assert.ok(script.includes('fullFilmDialogueEvidence.map('),'Full-film dialogue must remain timestamped in script');
+vm.runInContext(functionSource('formatTime')+'\n'+functionSource('addSourceDialogue'),ctx);
+const sourceScenes=[{time:25,labels:[]}],sourceEvidence=[];
+assert.equal(ctx.addSourceDialogue({time:325,lang:'en',text:'Take the map to the house.'},sourceScenes,sourceEvidence),true);
+assert.equal(sourceEvidence.length,1,'Preserve distant original speech in global timeline');
+assert.ok(!sourceScenes[0].dialogueEvidenceList,'Distant dialogue must not be falsely placed over unrelated scenes');
+assert.equal(ctx.addSourceDialogue({time:26,lang:'my',text:'မင်္ဂလာပါ။'},sourceScenes,sourceEvidence),true);
+assert.equal(sourceScenes[0].dialogueEvidenceList.length,1,'Nearby Burmese dialogue must attach to matching scene');
+assert.equal(ctx.addSourceDialogue({time:26,lang:'my',text:'မင်္ဂလာပါ။'},sourceScenes,sourceEvidence),false,'Deduplicate source utterance at same timestamp');
 
 ctx.visualDict={person:'လူ',house:'အိမ်'};
 vm.runInContext(functionSource('briefGroundedNarration'),ctx);
@@ -45,6 +54,10 @@ const grounded=ctx.briefGroundedNarration({
   ]});
 assert.ok(grounded.includes('လူ') && !grounded.includes('John'),
   'Non-Burmese speech must not be falsely narrated as a Burmese translation');
+const matchingVoice=ctx.briefGroundedNarration(sourceScenes[0],24,36);
+assert.ok(matchingVoice.includes('မင်္ဂလာပါ'),'Burmese quote in source clip should be narrated');
+const unrelatedVoice=ctx.briefGroundedNarration(sourceScenes[0],90,102);
+assert.ok(!unrelatedVoice.includes('မင်္ဂလာပါ'),'Never reuse an unrelated Burmese quote in a different highlight clip');
 assert.ok(script.includes('if(end-start>=5)'),'Tiny segments must not force truncated speech');
 const frames=Array.from({length:20},(_,i)=>({time:40+i*87,diff:i===0?1:i/22,thumb:'data:image/jpeg;base64,ABCD'}));
 const picks=ctx.chooseNativeScenes(frames,1802,10);
