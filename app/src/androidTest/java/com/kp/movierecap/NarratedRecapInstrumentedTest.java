@@ -49,6 +49,11 @@ public final class NarratedRecapInstrumentedTest {
             MovieExportPreflight.verify(app, Uri.fromFile(source),
                 Collections.singletonList(
                     new VideoHighlightsExporter.Range(0L, 10000000L)));
+            // Ordinary videos without embedded subtitles must still be accepted.
+            org.json.JSONObject embedded = MovieSubtitleExtractor.read(
+                app, Uri.fromFile(source), 20);
+            assertEquals("Synthetic source must not invent embedded subtitle text",
+                0, embedded.getJSONArray("cues").length());
             boolean rejected = false;
             try {
                 MovieExportPreflight.verify(app, Uri.fromFile(source),
