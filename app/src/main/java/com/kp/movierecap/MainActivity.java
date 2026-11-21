@@ -311,6 +311,9 @@ public final class MainActivity extends Activity {
                     captionedExporter = new CaptionedVideoExporter();
                     captionedExporter.start(this, source, ranges, captions, speech, output,
                         new CaptionedVideoExporter.Callback() {
+                            @Override public void onProgress(int percent) {
+                                reportNativeExportProgress(percent);
+                            }
                             @Override public void onSuccess(File encoded) {
                                 captionedExporter = null;
                                 speech.delete();
@@ -415,6 +418,14 @@ public final class MainActivity extends Activity {
             String json = payload == null ? "null" : payload.toString();
             webView.evaluateJavascript("window.onNativeDialogueResult(" + json + "," +
                 JSONObject.quote(error == null ? "" : error) + ")", null);
+        });
+    }
+
+    private void reportNativeExportProgress(int percent) {
+        final int safe = Math.max(0, Math.min(100, percent));
+        runOnUiThread(() -> {
+            if (webView != null) webView.evaluateJavascript(
+                "window.onNativeExportProgress(" + safe + ")", null);
         });
     }
 
