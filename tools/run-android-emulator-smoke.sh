@@ -10,7 +10,7 @@ adb shell am instrument -w -r \
   -e class com.kp.movierecap.OneClickRecapUiInstrumentedTest \
   com.kp.movierecap.test/androidx.test.runner.AndroidJUnitRunner \
   | tee /tmp/kp-ui-emulator-test.log
-grep -E 'OK \\(1 test\\)' /tmp/kp-ui-emulator-test.log
+grep -E 'OK \(1 test\)' /tmp/kp-ui-emulator-test.log
 # Avoid combining the UI encoder with heavy ONNX and media
 # preflight tests in a single instrumented app process.
 adb shell am force-stop com.kp.movierecap || true
@@ -21,7 +21,7 @@ adb shell am instrument -w -r \
   -e class com.kp.movierecap.NarratedRecapInstrumentedTest \
   com.kp.movierecap.test/androidx.test.runner.AndroidJUnitRunner \
   | tee /tmp/kp-media-emulator-test.log
-grep -E 'OK \\(5 tests\\)' /tmp/kp-media-emulator-test.log
+grep -E 'OK \(5 tests\)' /tmp/kp-media-emulator-test.log
 
 echo "[KP Recap] Pulling proof MP4 and WAV from Android private test cache"
 adb exec-out run-as com.kp.movierecap cat cache/kp_ci_narrated.mp4 > kp-emulator-narrated-proof.mp4
