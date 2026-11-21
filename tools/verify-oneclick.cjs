@@ -82,6 +82,10 @@ assert.ok(activity.includes('saveCaptionedToMovies('), 'Caption MP4 auto-save mi
 const preflight=fs.readFileSync('app/src/main/java/com/kp/movierecap/MovieExportPreflight.java','utf8');
 assert.ok(activity.includes('MovieExportPreflight.verify('),
   'One-click export must validate source video and storage before offline TTS');
+assert.ok(activity.includes('MovieExportPreflight.verifyOutput(encoded)'),
+  'App must verify decoded video and audio tracks before declaring MP4 saved');
+assert.ok(preflight.includes('video = true') && preflight.includes('audio = true'),
+  'Completed MP4 must contain valid video and speech tracks');
 assert.ok(preflight.includes('METADATA_KEY_VIDEO_WIDTH') &&
   preflight.includes('getAvailableBytes()'),
   'Preflight must validate the selected video and available storage');
