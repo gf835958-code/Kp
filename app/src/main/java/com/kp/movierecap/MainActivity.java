@@ -405,12 +405,14 @@ public final class MainActivity extends Activity {
     }
 
     /** Publish the completed MP4 only when export has finished successfully. */
-    private void saveCaptionedToMovies(File encoded) {
+    private void saveCaptionedToMovies(File encoded, int job) {
         io.execute(() -> {
             Uri output = null;
             try {
                 // Never tell the user a "finished video" exists unless the
                 // file is truly decodable and contains BOTH picture and voice.
+                if (isExportCancelled(job))
+                    throw new IllegalStateException("Export cancelled");
                 MovieExportPreflight.verifyOutput(encoded);
                 ContentValues values = new ContentValues();
                 values.put(MediaStore.Video.Media.DISPLAY_NAME,
@@ -426,9 +428,13 @@ public final class MainActivity extends Activity {
                     if (out == null) throw new IllegalStateException("Cannot open MP4 stream");
                     byte[] buffer = new byte[65536];
                     int read;
-                    while ((read = in.read(buffer)) >= 0)
+                    while ((read = in.read(buffer)) >= 0) {
+                        if (isExportCancelled(job)) throw new IllegalStateException("Export cancelled");
                         if (read > 0) out.write(buffer, 0, read);
+                    }
                 }
+                if (isExportCancelled(job))
+                    throw new IllegalStateException("Export cancelled");
                 ContentValues done = new ContentValues();
                 done.put(MediaStore.Video.Media.IS_PENDING, 0);
                 getContentResolver().update(output, done, null, null);
@@ -439,10 +445,13 @@ public final class MainActivity extends Activity {
                     try { getContentResolver().delete(output, null, null); }
                     catch (Exception ignored) {}
                 }
-                autoExportFeedback(false, "Captioned MP4 save failed: " + e.getMessage());
+                if (isExportCancelled(job))
+                    finishCancelledExport(job);
+                else
+                    autoExportFeedback(false, "Captioned MP4 save failed: " + e.getMessage());
             } finally {
                 encoded.delete();
-                exporting = false;
+                if (exportGeneration == job) exporting = false;
             }
         });
     }
@@ -662,6 +671,25 @@ public final class MainActivity extends Activity {
             });
         }
 
+        @JavascriptInterface public void cancelCurrentExport() {
+            runOnUiThread(() -> {
+                if (!exporting) return;
+                exportCancelRequested = true;
+                CaptionedVideoExporter current = captionedExporter;
+                if (current != null) {
+                    // Media3 cancel executes on its application/main thread.
+                    // A newer generation makes any late callbacks stale.
+                    captionedExporter = null;
+                    exportGeneration++;
+                    exporting = false;
+                    current.cancel();
+                    autoExportFeedback(false, "Video ဖန်တီးမှုကို ရပ်လိုက်ပါပြီ။");
+                }
+                // If offline TTS or MediaStore copy is still active, its worker
+                // observes cancellation and clears the state itself.
+            });
+        }
+
         @JavascriptInterface public void exportCaptionedAuto(String rangesJson,
                 String captionsJson) {
             runOnUiThread(() -> {
@@ -683,8 +711,10 @@ public final class MainActivity extends Activity {
                             throw new IllegalArgumentException("Caption too long");
                         captions.add(caption);
                     }
+                    exportCancelRequested = false;
+                    int job = ++exportGeneration;
                     exporting = true;
-                    exportCaptionedToMovies(ranges, captions);
+                    exportCaptionedToMovies(ranges, captions, job);
                 } catch (Exception e) {
                     exporting = false;
                     autoExportFeedback(false, "Caption settings invalid: " + e.getMessage());
@@ -724,6 +754,12 @@ public final class MainActivity extends Activity {
         if (webView != null && webView.canGoBack()) webView.goBack(); else super.onBackPressed();
     }
     @Override public void onDestroy() {
+        exportCancelRequested = true;
+        exportGeneration++;
+        if (captionedExporter != null) {
+            captionedExporter.cancel();
+            captionedExporter = null;
+        }
         if (filePickerCallback != null) filePickerCallback.onReceiveValue(null);
         if (tts != null) { tts.stop(); tts.shutdown(); }
         imageLabeler.close();
