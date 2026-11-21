@@ -35,6 +35,44 @@ public final class NarratedRecapInstrumentedTest {
      * WebView seeks time out when scanning a 30-minute MP4. This test exercises
      * real Android native frame extraction on an offline 1802-second H264 file.
      */
+    @Test public void preflightAcceptsPlayableVideoAndRejectsBadClips() throws Exception {
+        Context app = InstrumentationRegistry.getInstrumentation().getTargetContext();
+        Context runner = InstrumentationRegistry.getInstrumentation().getContext();
+        File source = new File(app.getCacheDir(), "kp_ci_validate.mp4");
+        try (InputStream in = runner.getAssets().open("kp-smoke.mp4");
+             FileOutputStream out = new FileOutputStream(source)) {
+            byte[] buffer = new byte[8192];
+            int read;
+            while ((read = in.read(buffer)) >= 0) if (read > 0) out.write(buffer, 0, read);
+        }
+        try {
+            MovieExportPreflight.verify(app, Uri.fromFile(source),
+                Collections.singletonList(
+                    new VideoHighlightsExporter.Range(0L, 10000000L)));
+            boolean rejected = false;
+            try {
+                MovieExportPreflight.verify(app, Uri.fromFile(source),
+                    Collections.singletonList(
+                        new VideoHighlightsExporter.Range(1000000L, 25000000L)));
+            } catch (IllegalArgumentException expected) {
+                rejected = true;
+            }
+            assertTrue("Invalid 24-second clip must not export", rejected);
+            rejected = false;
+            try {
+                MovieExportPreflight.verify(app, Uri.fromFile(source),
+                    java.util.Arrays.asList(
+                        new VideoHighlightsExporter.Range(5000000L, 9000000L),
+                        new VideoHighlightsExporter.Range(3000000L, 4000000L)));
+            } catch (IllegalArgumentException expected) {
+                rejected = true;
+            }
+            assertTrue("Unordered scene clips must not misalign captions", rejected);
+        } finally {
+            source.delete();
+        }
+    }
+
     @Test public void speechRecognizerDoesNotInventWordsFromSilence() throws Exception {
         Context target = InstrumentationRegistry.getInstrumentation().getTargetContext();
         Context tester = InstrumentationRegistry.getInstrumentation().getContext();
