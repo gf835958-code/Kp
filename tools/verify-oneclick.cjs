@@ -113,4 +113,9 @@ assert.ok(html.includes('ဇာတ်လမ်းတစ်ကားလုံး'
   html.includes('AI မပြီးသေးပါ'), 'Experimental story limitation not disclosed');
 assert.ok(!html.includes('Burmese TTS Model မထည့်ရသေးပါ'),
   'Outdated unsupported voice-model copy still visible');
+assert.ok(script.includes('window.onNativeExportProgress='),'Real render progress listener missing');
+assert.ok(activity.includes('void reportNativeExportProgress('),'Native render progress bridge missing');
+assert.ok(captioned.includes('current.getProgress(progress)'),'Media3 actual progress polling missing');
+assert.ok(script.includes("setProgress($('autoBtn').disabled?82:100"),
+  'Scan must not report 100% for whole one-click MP4 pipeline');
 console.log('PASS: JavaScript syntax, native 30min scene planning, distributed dialogue coverage, silent-audio guard, narrated MP4 wiring');
