@@ -86,6 +86,17 @@ public final class OneClickRecapUiInstrumentedTest {
                 } catch (Exception e) { throw new AssertionError(e); }
             });
             waitForWebView(scenario);
+            CountDownLatch painted = new CountDownLatch(1);
+            scenario.onActivity(activity -> {
+                try {
+                    Field ref = MainActivity.class.getDeclaredField("webView");
+                    ref.setAccessible(true);
+                    WebView view = (WebView) ref.get(activity);
+                    view.postVisualStateCallback(123L, id -> painted.countDown());
+                } catch (Exception e) { throw new AssertionError(e); }
+            });
+            assertTrue("WebView never committed a visual frame",
+                painted.await(25, TimeUnit.SECONDS));
             // A ready JavaScript document can precede actual WebView rasterization.
             // Wait for visible frames, then reject an empty "visual proof" image.
             InstrumentationRegistry.getInstrumentation().waitForIdleSync();
