@@ -1,0 +1,81 @@
+name: Build Auto MMSub Android APK
+
+on:
+  push:
+    branches:
+      - auto-mmsub-apk-build-20261121
+    paths:
+      - 'build-payload/**'
+      - '.github/workflows/auto-mmsub-build.yml'
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'build-payload/**'
+      - '.github/workflows/auto-mmsub-build.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  android-debug-apk:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - name: Checkout exact source
+        uses: actions/checkout@v4
+      - name: Recover and verify original Auto MMSub Android v1.0 sources
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p android
+          cat build-payload/part0*.b64 | base64 --decode > /tmp/auto-mmsub-source.tar.xz
+          echo 'c6b810fdbc5fd31fc837972e950beb991add1e1d3325ffd0e2aa9fc6f518ab6a  /tmp/auto-mmsub-source.tar.xz' | sha256sum -c -
+          tar -xJf /tmp/auto-mmsub-source.tar.xz -C android
+          test -f android/app/src/main/java/com/kp/autommsub/MainActivity.kt
+          test -f android/app/src/main/java/com/kp/autommsub/Network.kt
+      - name: Apply tested Kotlin compilation fixes
+        run: python3 build-payload/app-fixes.py
+      - name: Apply v1.2 on-device file inspection update
+        run: python3 build-payload/v12-patch.py
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Install Android SDK 35 with preinstalled command-line tools
+        shell: bash
+        run: |
+          set -euo pipefail
+          SDK_ROOT=/usr/local/lib/android/sdk
+          SDKMGR=$(find "$SDK_ROOT/cmdline-tools" -maxdepth 3 -type f -name sdkmanager | sort -V | tail -1)
+          test -x "$SDKMGR"
+          echo "ANDROID_HOME=$SDK_ROOT" >> "$GITHUB_ENV"
+          echo "ANDROID_SDK_ROOT=$SDK_ROOT" >> "$GITHUB_ENV"
+          dirname "$SDKMGR" >> "$GITHUB_PATH"
+          "$SDKMGR" --version
+          "$SDKMGR" --sdk_root="$SDK_ROOT" 'platforms;android-35' 'build-tools;35.0.0'
+      - name: Install Gradle 8.11.1
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.11.1'
+      - name: Compile and assemble full Android application
+        working-directory: android
+        run: gradle --no-daemon :app:assembleDebug --stacktrace
+      - name: Verify APK and signature
+        shell: bash
+        run: |
+          set -euo pipefail
+          APK=android/app/build/outputs/apk/debug/app-debug.apk
+          test -s "$APK"
+          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose "$APK"
+          "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$APK" | head -n 10
+          sha256sum "$APK" | tee "$APK.sha256"
+      - name: Upload installable APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: Auto-MMSub-Android-debug-APK
+          path: |
+            android/app/build/outputs/apk/debug/app-debug.apk
+            android/app/build/outputs/apk/debug/app-debug.apk.sha256
+          if-no-files-found: error
+          retention-days: 30
