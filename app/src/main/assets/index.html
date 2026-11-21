@@ -139,7 +139,7 @@ function toast(msg){$('toast').textContent=msg;$('toast').style.display='block';
 function formatTime(s){if(!Number.isFinite(s))return '00:00';let x=Math.max(0,Math.floor(s));return String(Math.floor(x/60)).padStart(2,'0')+':'+String(x%60).padStart(2,'0')}
 $('choose').onclick=e=>{e.stopPropagation();$('file').click()};$('drop').onclick=e=>{if(e.target.id==='choose')return;$('file').click()};$('drop').onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();$('file').click()}};
 $('drop').ondragover=e=>{e.preventDefault();$('drop').classList.add('drag')};$('drop').ondragleave=()=>$('drop').classList.remove('drag');$('drop').ondrop=e=>{e.preventDefault();$('drop').classList.remove('drag');if(e.dataTransfer.files.length)loadFile(e.dataTransfer.files[0])};$('file').onchange=e=>{if(e.target.files.length)loadFile(e.target.files[0])};
-function loadFile(file){lastNativeDuration=0;if(!file.type.startsWith('video/'))return toast('Video File ကိုပဲ ရွေးပေးပါ။');demoMode=false;if(objectUrl)URL.revokeObjectURL(objectUrl);currentFile=file;objectUrl=URL.createObjectURL(file);$('preview').src=objectUrl;$('videoWrap').style.display='block';$('fileMeta').textContent=file.name+' • '+(file.size/1048576).toFixed(1)+' MB';shotList=[];renderShots();$('script').value='';toast('Video Import လုပ်ပြီးပါပြီ။ Scene Scan စမ်းနိုင်ပါတယ်။')}
+function loadFile(file){lastNativeDuration=0;if(!file.type.startsWith('video/'))return toast('Video File ကိုပဲ ရွေးပေးပါ။');demoMode=false;if(objectUrl)URL.revokeObjectURL(objectUrl);currentFile=file;objectUrl=URL.createObjectURL(file);$('preview').src=objectUrl;$('autoBtn').disabled=false;$('exportResult').hidden=true;$('progress').style.display='none';$('autoBtn').textContent='✨ မြန်မာအသံ Video ဖန်တီးမယ်';$('videoWrap').style.display='block';$('fileMeta').textContent=file.name+' • '+(file.size/1048576).toFixed(1)+' MB';shotList=[];renderShots();$('script').value='';autoStatus('✅ Video ရွေးပြီးပါပြီ။ မြန်မာအသံ Video ဖန်တီးမယ် ခလုတ်ကို နှိပ်ပါ။','ready');toast('Video ရွေးပြီးပါပြီ။')}
 const demoBurmese = [
   'ဇာတ်လမ်းစမ်းသပ်မှုမှာ အရောင်တစ်ခုနဲ့ ပထမမြင်ကွင်း စတင်လာပါတယ်။',
   'နောက်ထပ်မြင်ကွင်းမှာ အရောင်ပြောင်းလဲပြီး ဇာတ်ကြောင်းတစ်ခု ဆက်သွားပါတယ်။',
@@ -352,46 +352,64 @@ function buildAutoCaptionPlan(){
   }
   return {clips,captions};
 }
-function autoStatus(message){$('autoStatus').textContent=message;}
+function autoStatus(message,state='running'){
+  const notice=$('autoStatus');
+  notice.textContent=message;
+  notice.dataset.state=state;
+}
 window.onAutoExportResult=(success,message)=>{
-  autoStatus((success?'✅ ':'❌ ')+message);
+  autoStatus((success?'✅ ':'❌ ')+message,success?'success':'error');
   $('autoBtn').disabled=false;
-  $('autoBtn').textContent='⚡ Generate Video — One Click';
+  $('autoBtn').textContent='✨ မြန်မာအသံ Video ဖန်တီးမယ်';
+  $('exportResult').hidden=!success;
+  if(success) {
+    $('progress').style.display='block';
+    $('progBar').style.width='100%';
+    $('progTxt').textContent='ပြီးပါပြီ • 100%';
+  }
   toast(message);
 };
+$('openVideo').onclick=()=>{
+  if(window.AndroidRecap && typeof AndroidRecap.openLastExportedVideo==='function')
+    AndroidRecap.openLastExportedVideo();
+  else toast('Video ကို Files → Movies → KP Movie Recap မှာ ဖွင့်ကြည့်နိုင်ပါတယ်။');
+};
 $('detailsToggle').onclick=()=>{
- document.body.classList.toggle('show-advanced');
- $('detailsToggle').textContent=document.body.classList.contains('show-advanced')?'Hide Advanced Details':'Show Advanced Details';
+ const show=document.body.classList.toggle('show-advanced');
+ $('detailsToggle').setAttribute('aria-expanded',String(show));
+ $('detailsToggle').textContent=show?'⚙️ အသေးစိတ်ပိတ်ရန် ▴':'⚙️ အသေးစိတ်ကြည့်ရန် ▾';
 };
 $('autoBtn').onclick=async()=>{
   if(!currentFile) return toast('Movie Video ကို အရင်ရွေးပါ။');
   if(!window.AndroidRecap || typeof AndroidRecap.exportHighlightsAuto!=='function') return toast('One Click Export ကို Android APK မှာသာ ရနိုင်ပါတယ်။');
   if(busy || $('autoBtn').disabled) return;
   $('autoBtn').disabled=true;
-  $('autoBtn').textContent='⏳ Creating video…';
-  autoStatus('Scene Detection နှင့် AI Frame Labels စစ်နေပါတယ်...');
+  $('exportResult').hidden=true;
+  $('autoBtn').textContent='⏳ ဖန်တီးနေပါတယ်…';
+  autoStatus('🔎 မြင်ကွင်းနဲ့ အသံကို စစ်နေပါတယ်…','running');
   await $('scanBtn').onclick();
   if(!shotList.length) {
     $('autoBtn').disabled=false;
-    $('autoBtn').textContent='⚡ Generate Video — One Click';
-    return autoStatus('❌ Scene Scan မအောင်မြင်ပါ။ MP4 Video နဲ့ ထပ်စမ်းပါ။');
+    $('autoBtn').textContent='✨ မြန်မာအသံ Video ဖန်တီးမယ်';
+    return autoStatus('❌ Video ကို မဖတ်နိုင်ပါ။ MP4 တစ်ခုနဲ့ ထပ်စမ်းပါ။','error');
   }
   const plan=buildAutoCaptionPlan();
   const clips=plan.clips;
-  if(!clips.length) { $('autoBtn').disabled=false;return autoStatus('❌ Video အပိုင်းတွေ ရွေးထုတ်မရပါ။'); }
-  autoStatus('မြန်မာအသံနဲ့ စာတန်းတွေကို MP4 ထဲ ပေါင်းထုတ်နေပါတယ်...');
+  if(!clips.length) { $('autoBtn').disabled=false;$('autoBtn').textContent='✨ မြန်မာအသံ Video ဖန်တီးမယ်';return autoStatus('❌ အသံထည့်နိုင်မယ့် Video အပိုင်းမရှိပါ။ နောက် Video တစ်ခု စမ်းပါ။','error'); }
+  autoStatus('🎬 မြန်မာအသံနဲ့ စာတန်းတွေကို Video ထဲ ပေါင်းထုတ်နေပါတယ်…','running');
   try {
     if(typeof AndroidRecap.exportCaptionedAuto==='function') {
       AndroidRecap.exportCaptionedAuto(JSON.stringify(clips),JSON.stringify(plan.captions));
     } else {
-      autoStatus('❌ Subtitle video export engine not installed in this APK.');
+      autoStatus('❌ ဒီ App မှာ Video Export Engine မရှိပါ။','error');
       $('autoBtn').disabled=false;
-      $('autoBtn').textContent='⚡ Generate Video — One Click';
+      $('autoBtn').textContent='✨ မြန်မာအသံ Video ဖန်တီးမယ်';
     }
   }
   catch(e) { window.onAutoExportResult(false,'Export failure: '+e.message); }
 };
 $('voice').onclick=()=>{let s=$('script').value.trim();if(!s)return toast('Recap Script အရင်ရေးပါ။');if(!window.AndroidRecap)return toast('Voice File ကို Android APK မှာသာ ထုတ်နိုင်ပါတယ်။');AndroidRecap.saveNarration(s,$('lang').value==='my'?'my-MM':'en-US');toast('TTS Engine ဖြင့် အသံဖိုင် ဖန်တီးနေပါတယ်။')};
 $('srt').onclick=()=>{if(!shotList.length)return toast('Scene Scan အရင်လုပ်ပါ။');let notes=shotList.map((s,i)=>({t:s.time,text:s.note.trim()})).filter(s=>s.text);if(!notes.length)return toast('Auto Visual Summary မပြီးသေးပါ။');function ss(t){let h=Math.floor(t/3600),m=Math.floor(t%3600/60),s=Math.floor(t%60),ms=Math.floor((t%1)*1000);return [h,m,s].map(x=>String(x).padStart(2,'0')).join(':')+','+String(ms).padStart(3,'0')}let srt=notes.map((x,i)=>`${i+1}\n${ss(x.t)} --> ${ss(Math.min((i+1<notes.length?notes[i+1].t:x.t+5),x.t+8))}\n${x.text}\n`).join('\n');download(fn()+'-draft.srt',srt,'text/plain;charset=utf-8');toast('Scene-based Draft Subtitle Export လုပ်ပြီးပါပြီ။ (Voice-sync မဟုတ်သေးပါ)')};
+$('autoBtn').disabled=!currentFile;
 </script>
 </body></html>
