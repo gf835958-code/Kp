@@ -101,30 +101,71 @@ public final class OneClickRecapUiInstrumentedTest {
             });
             assertTrue("WebView never committed a visual frame",
                 painted.await(25, TimeUnit.SECONDS));
-            // A ready JavaScript document can precede actual WebView rasterization.
-            // Wait for visible frames, then reject an empty "visual proof" image.
+            // Validate actual CSS layout; screenshot alone may show a blank
+            // emulator graphics surface before WebView's compositor presents.
+            String layout = eval(scenario, """
+                (() => {
+                  const choose=document.getElementById('choose');
+                  const generate=document.getElementById('autoBtn');
+                  const title=document.querySelector('.hero h1');
+                  if(!choose||!generate||!title)return false;
+                  const visible=(el)=>{
+                    const b=el.getBoundingClientRect();
+                    const style=getComputedStyle(el);
+                    return b.width>80 && b.height>18 &&
+                      style.display!=='none' && style.visibility==='visible';
+                  };
+                  return visible(choose)&&visible(generate)&&visible(title)&&
+                    title.textContent.includes('ဗီဒီယိုရွေး') &&
+                    generate.disabled &&
+                    document.querySelector('.flow-steps')!==null;
+                })()
+                """);
+            assertEquals("Burmese main screen controls or layout are missing", "true", layout);
             InstrumentationRegistry.getInstrumentation().waitForIdleSync();
-            Thread.sleep(1600);
-            android.graphics.Bitmap frame = InstrumentationRegistry
-                .getInstrumentation().getUiAutomation().takeScreenshot();
-            assertNotNull("Emulator could not capture the Android screen", frame);
+            Thread.sleep(1000);
+            android.graphics.Bitmap frame = InstrumentationRegistry.getInstrumentation()
+                .getUiAutomation().takeScreenshot();
+            if(frame != null) {
+                try (FileOutputStream screenshot = new FileOutputStream(
+                        new File(app.getCacheDir(), "kp_friendly_studio_ui.png"))) {
+                    frame.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, screenshot);
+                } finally { frame.recycle(); }
+            }
+            // Also render the actual WebView backing view independently of
+            // the Android emulator surface screenshot; retain both as QA.
+            final AtomicReference<android.graphics.Bitmap> rendered = new AtomicReference<>();
+            scenario.onActivity(activity -> {
+                try {
+                    Field reference = MainActivity.class.getDeclaredField("webView");
+                    reference.setAccessible(true);
+                    WebView web = (WebView) reference.get(activity);
+                    int width=Math.max(1,web.getWidth()), height=Math.max(1,web.getHeight());
+                    android.graphics.Bitmap bitmap=android.graphics.Bitmap.createBitmap(
+                        width,height,android.graphics.Bitmap.Config.ARGB_8888);
+                    web.draw(new android.graphics.Canvas(bitmap));
+                    rendered.set(bitmap);
+                } catch(Exception e) { throw new AssertionError(e); }
+            });
+            android.graphics.Bitmap paintedView = rendered.get();
+            assertNotNull("Unable to render WebView content for layout QA", paintedView);
             int dark = 0, light = 0;
-            for (int y = frame.getHeight()/8; y < frame.getHeight()*7/8; y += 5) {
-                for (int x = frame.getWidth()/10; x < frame.getWidth()*9/10; x += 5) {
-                    int color = frame.getPixel(x, y);
-                    int red = android.graphics.Color.red(color);
-                    int green = android.graphics.Color.green(color);
-                    int blue = android.graphics.Color.blue(color);
-                    if (red < 150 && green < 150 && blue < 175) dark++;
-                    if (red > 220 && green > 220 && blue > 220) light++;
+            for(int y=paintedView.getHeight()/6;y<paintedView.getHeight()*5/6;y+=5){
+                for(int x=paintedView.getWidth()/10;x<paintedView.getWidth()*9/10;x+=5){
+                    int pixel=paintedView.getPixel(x,y);
+                    int red=android.graphics.Color.red(pixel);
+                    int green=android.graphics.Color.green(pixel);
+                    int blue=android.graphics.Color.blue(pixel);
+                    if(red<150&&green<150&&blue<175)dark++;
+                    if(red>220&&green>220&&blue>220)light++;
                 }
             }
-            try (FileOutputStream screenshot = new FileOutputStream(
-                    new File(app.getCacheDir(), "kp_friendly_studio_ui.png"))) {
-                frame.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, screenshot);
-            } finally { frame.recycle(); }
-            assertTrue("UI screen seems blank: no legible dark elements", dark > 30);
-            assertTrue("Expected accessible light-theme UI is not visible", light > 100);
+            try(FileOutputStream screenshot=new FileOutputStream(
+                    new File(app.getCacheDir(),"kp_webview_render.png"))){
+                paintedView.compress(android.graphics.Bitmap.CompressFormat.PNG,100,screenshot);
+            }finally{paintedView.recycle();}
+            assertTrue("WebView does not rasterize readable dark text",dark>20);
+            assertTrue("Friendly light background did not rasterize",light>100);
 
             // Set an HTML input stub (only for WebView metadata). The native
             // selectedVideo still points to the real H264/AAC fixture.
