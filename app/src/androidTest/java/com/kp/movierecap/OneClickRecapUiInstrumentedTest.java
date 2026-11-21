@@ -86,19 +86,30 @@ public final class OneClickRecapUiInstrumentedTest {
                 } catch (Exception e) { throw new AssertionError(e); }
             });
             waitForWebView(scenario);
-            // Capture a real Android screen for visual QA. Screenshot failure
-            // must not hide useful functional test results.
-            try {
-                android.graphics.Bitmap frame = InstrumentationRegistry
-                    .getInstrumentation().getUiAutomation().takeScreenshot();
-                if (frame != null) {
-                    try (FileOutputStream screenshot = new FileOutputStream(
-                            new File(app.getCacheDir(), "kp_friendly_studio_ui.png"))) {
-                        frame.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, screenshot);
-                    }
-                    frame.recycle();
+            // A ready JavaScript document can precede actual WebView rasterization.
+            // Wait for visible frames, then reject an empty "visual proof" image.
+            InstrumentationRegistry.getInstrumentation().waitForIdleSync();
+            Thread.sleep(1600);
+            android.graphics.Bitmap frame = InstrumentationRegistry
+                .getInstrumentation().getUiAutomation().takeScreenshot();
+            assertNotNull("Emulator could not capture the Android screen", frame);
+            int dark = 0, light = 0;
+            for (int y = frame.getHeight()/8; y < frame.getHeight()*7/8; y += 5) {
+                for (int x = frame.getWidth()/10; x < frame.getWidth()*9/10; x += 5) {
+                    int color = frame.getPixel(x, y);
+                    int red = android.graphics.Color.red(color);
+                    int green = android.graphics.Color.green(color);
+                    int blue = android.graphics.Color.blue(color);
+                    if (red < 150 && green < 150 && blue < 175) dark++;
+                    if (red > 220 && green > 220 && blue > 220) light++;
                 }
-            } catch (Exception ignored) { /* optional visual evidence */ }
+            }
+            try (FileOutputStream screenshot = new FileOutputStream(
+                    new File(app.getCacheDir(), "kp_friendly_studio_ui.png"))) {
+                frame.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, screenshot);
+            } finally { frame.recycle(); }
+            assertTrue("UI screen seems blank: no legible dark elements", dark > 30);
+            assertTrue("Expected accessible light-theme UI is not visible", light > 100);
 
             // Set an HTML input stub (only for WebView metadata). The native
             // selectedVideo still points to the real H264/AAC fixture.
