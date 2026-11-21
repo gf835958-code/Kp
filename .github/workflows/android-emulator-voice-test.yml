@@ -11,9 +11,15 @@ on:
       - 'app/src/main/java/com/kp/movierecap/CaptionedVideoExporter.java'
       - 'app/src/main/java/com/kp/movierecap/MovieAudioSampler.java'
       - 'app/src/main/java/com/kp/movierecap/DialogueTranscriber.java'
+      - 'app/src/main/java/com/kp/movierecap/BurmeseNarration.java'
+      - 'app/src/main/java/com/kp/movierecap/MovieExportPreflight.java'
       - 'tools/fetch-asr-model.sh'
       - '.github/workflows/android-emulator-voice-test.yml'
   workflow_dispatch:
+
+concurrency:
+  group: android-movie-test-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   phone-runtime-smoke:
