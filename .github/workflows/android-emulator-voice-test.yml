@@ -112,5 +112,6 @@ jobs:
           path: |
             kp-emulator-narrated-proof.mp4
             kp-emulator-burmese-proof.wav
+            kp-friendly-ui-screen.png
           retention-days: 7
 
