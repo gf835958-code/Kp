@@ -314,10 +314,11 @@ public final class MainActivity extends Activity {
         io.execute(() -> {
             final File speech;
             try {
+                MovieExportPreflight.verify(MainActivity.this, source, ranges);
                 speech = BurmeseNarration.generate(MainActivity.this, captions, ranges);
             } catch (Exception | UnsatisfiedLinkError e) {
                 exporting = false;
-                autoExportFeedback(false, "Myanmar TTS not ready: " + e.getMessage());
+                autoExportFeedback(false, "Video / မြန်မာအသံ မဖန်တီးနိုင်ပါ: " + e.getMessage());
                 return;
             }
             runOnUiThread(() -> {
@@ -413,7 +414,15 @@ public final class MainActivity extends Activity {
             }
             ranges.add(new VideoHighlightsExporter.Range((long)(start * 1_000_000), (long)(end * 1_000_000)));
         }
-        ranges.sort(Comparator.comparingLong(r -> r.startUs));
+        // Preserve the caption-to-clip mapping. Reordering ranges while
+        // leaving narration text in user order would put wrong speech over
+        // unrelated scenes; fail safely instead.
+        long lastEnd = 0;
+        for (VideoHighlightsExporter.Range range : ranges) {
+            if (range.startUs < lastEnd)
+                throw new IllegalArgumentException("Scene clips are unordered or overlap");
+            lastEnd = range.endUs;
+        }
         return ranges;
     }
 
