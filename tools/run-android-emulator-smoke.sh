@@ -22,4 +22,7 @@ if adb shell run-as com.kp.movierecap ls cache/kp_friendly_studio_ui.png >/dev/n
 fi
 echo "[KP Recap] Checking instrumentation assertion summary"
 grep -E 'OK \(4 tests\)' /tmp/kp-emulator-test.log
+if adb shell run-as com.kp.movierecap ls cache/kp_webview_render.png >/dev/null 2>&1; then
+  adb exec-out run-as com.kp.movierecap cat cache/kp_webview_render.png > kp-webview-render.png
+fi
 echo "[KP Recap] PASS: emulator produced and validated narrated MP4"
