@@ -104,9 +104,9 @@ jobs:
             -of default=noprint_wrappers=1 kp-emulator-narrated-proof.mp4 | grep -q codec_name=
           ffmpeg -hide_banner -loglevel error -i kp-emulator-narrated-proof.mp4 \
             -f null - 2>&1
-      - name: Keep small evidence video for private review (not a finished recap)
+      - name: Preserve real Android screen and output evidence even if UI validation fails
         uses: actions/upload-artifact@v4
-        if: success()
+        if: always()
         with:
           name: KP-Emulator-Burmese-Voice-Caption-Proof
           path: |
