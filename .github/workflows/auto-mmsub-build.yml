@@ -35,6 +35,8 @@ jobs:
           test -f android/app/src/main/java/com/kp/autommsub/Network.kt
       - name: Apply tested Kotlin compilation fixes
         run: python3 build-payload/app-fixes.py
+      - name: Apply v1.2 on-device file inspection update
+        run: python3 build-payload/v12-patch.py
       - name: Set up JDK 17
         uses: actions/setup-java@v4
         with:
