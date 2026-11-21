@@ -35,6 +35,38 @@ public final class NarratedRecapInstrumentedTest {
      * WebView seeks time out when scanning a 30-minute MP4. This test exercises
      * real Android native frame extraction on an offline 1802-second H264 file.
      */
+    @Test public void extractsOriginalMyanmarSubtitlesFromMp4() throws Exception {
+        Context app = InstrumentationRegistry.getInstrumentation().getTargetContext();
+        Context runner = InstrumentationRegistry.getInstrumentation().getContext();
+        File source = new File(app.getCacheDir(), "kp_ci_embedded_subtitles.mp4");
+        try (InputStream in = runner.getAssets().open("kp-subtitle.mp4");
+             FileOutputStream out = new FileOutputStream(source)) {
+            byte[] chunk = new byte[8192];
+            int n;
+            while ((n = in.read(chunk)) >= 0) if (n > 0) out.write(chunk, 0, n);
+        }
+        try {
+            org.json.JSONObject captions = MovieSubtitleExtractor.read(
+                app, Uri.fromFile(source), 30);
+            org.json.JSONArray cues = captions.getJSONArray("cues");
+            assertTrue("Video with Burmese mov_text must expose timed subtitle evidence",
+                cues.length() >= 2);
+            boolean greeting = false, map = false;
+            for (int i = 0; i < cues.length(); i++) {
+                org.json.JSONObject cue = cues.getJSONObject(i);
+                String words = cue.getString("text");
+                double time = cue.getDouble("time");
+                assertTrue("Original subtitle time outside movie", time >= 0 && time <= 12);
+                greeting |= words.contains("မင်္ဂလာပါ");
+                map |= words.contains("မြေပုံ");
+            }
+            assertTrue("Original Burmese subtitle greeting was not decoded", greeting);
+            assertTrue("Original Burmese second subtitle was not decoded", map);
+        } finally {
+            source.delete();
+        }
+    }
+
     @Test public void preflightAcceptsPlayableVideoAndRejectsBadClips() throws Exception {
         Context app = InstrumentationRegistry.getInstrumentation().getTargetContext();
         Context runner = InstrumentationRegistry.getInstrumentation().getContext();
