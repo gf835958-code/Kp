@@ -95,4 +95,22 @@ assert.ok(script.includes('window.onNativeDialogueProgress='),'UI progress recei
 
 assert.ok(fs.readFileSync('app/src/main/java/com/kp/movierecap/MovieAudioSampler.java','utf8')
   .includes('MediaCodec.createDecoderByType'), 'Movie audio decoder missing');
+// Mobile-first UI acceptance: one main action and an accessible result state.
+assert.ok(html.includes('class="flow-steps"') && html.includes('Video ရွေး') &&
+  html.includes('MP4 ကြည့်'), 'Three-step Burmese onboarding missing');
+assert.ok(html.includes('id="exportResult" hidden') &&
+  html.includes('id="openVideo"'), 'Saved output card missing');
+assert.ok(html.includes('id="detailsToggle"') &&
+  html.includes('aria-expanded="false"'), 'Accessible advanced-settings toggle missing');
+assert.ok(script.includes("$('autoBtn').disabled=!currentFile"),
+  'Generate action should be disabled until a video is selected');
+assert.ok(script.includes("$('exportResult').hidden=!success"),
+  'MP4 completion must reveal result, not only show transient toast');
+assert.ok(script.includes('AndroidRecap.openLastExportedVideo()') &&
+  activity.includes('void openLastExportedVideo()'),
+  'View saved MP4 native bridge missing');
+assert.ok(html.includes('ဇာတ်လမ်းတစ်ကားလုံး') &&
+  html.includes('AI မပြီးသေးပါ'), 'Experimental story limitation not disclosed');
+assert.ok(!html.includes('Burmese TTS Model မထည့်ရသေးပါ'),
+  'Outdated unsupported voice-model copy still visible');
 console.log('PASS: JavaScript syntax, native 30min scene planning, distributed dialogue coverage, silent-audio guard, narrated MP4 wiring');
