@@ -13,7 +13,7 @@ data class InputInspection(val uri: Uri, val kind: String, val filename: String,
                            val sizeBytes: Long, val summary: String)
 fun inspectInput(context: Context, uri: Uri, kind: String): InputInspection {
     require(kind == "video" || kind == "pdf")
-    var name = "input.\${if (kind == "video") "mp4" else "pdf"}"
+    var name = "input.${if (kind == "video") "mp4" else "pdf"}"
     var bytes = -1L
     context.contentResolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME,OpenableColumns.SIZE), null,null,null)?.use { cursor ->
         if(cursor.moveToFirst()) {
@@ -29,7 +29,7 @@ fun inspectInput(context: Context, uri: Uri, kind: String): InputInspection {
             if(bytes<=0) bytes=file.statSize
             PdfRenderer(file).use { pdf ->
                 if(pdf.pageCount==0) error("PDF has no pages")
-                "PDF · \${pdf.pageCount} pages · scanned pages may need OCR"
+                "PDF · ${pdf.pageCount} pages · scanned pages may need OCR"
             }
         }
     } else {
@@ -44,7 +44,7 @@ fun inspectInput(context: Context, uri: Uri, kind: String): InputInspection {
             if(durationMs<1) error("Video duration must be positive")
             val width=retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_WIDTH) ?: "?"
             val height=retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_HEIGHT) ?: "?"
-            "Video · \${durationMs / 1000}s · \${width}×\${height}"
+            "Video · ${durationMs / 1000}s · ${width}×${height}"
         } finally { retriever.release() }
     }
     if(bytes<=0) error("File size is unknown; select a locally available file")
@@ -72,7 +72,7 @@ s=change(s,'''    val videoPicker=rememberLauncherForActivityResult(ActivityResu
                 route=kind
             } catch (e: Exception) {
                 localInspection=null
-                alert="ဖိုင်စစ်ဆေးမှု မအောင်မြင်ပါ: \${e.message ?: "Unsupported format"}"
+                alert="ဖိုင်စစ်ဆေးမှု မအောင်မြင်ပါ: ${e.message ?: "Unsupported format"}"
             } finally { inspecting=false }
         }
     }
