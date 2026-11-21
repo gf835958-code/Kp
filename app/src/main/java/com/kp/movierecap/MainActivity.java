@@ -358,8 +358,9 @@ public final class MainActivity extends Activity {
         io.execute(() -> {
             Uri output = null;
             try {
-                if (!encoded.exists() || encoded.length() < 1024)
-                    throw new IllegalStateException("No MP4 created");
+                // Never tell the user a "finished video" exists unless the
+                // file is truly decodable and contains BOTH picture and voice.
+                MovieExportPreflight.verifyOutput(encoded);
                 ContentValues values = new ContentValues();
                 values.put(MediaStore.Video.Media.DISPLAY_NAME,
                     "KP-Visual-Captions-" + System.currentTimeMillis() + ".mp4");
