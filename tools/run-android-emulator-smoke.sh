@@ -11,7 +11,7 @@ adb shell am instrument -w -r \
   com.kp.movierecap.test/androidx.test.runner.AndroidJUnitRunner \
   | tee /tmp/kp-ui-emulator-test.log
 grep -E 'OK \\(1 test\\)' /tmp/kp-ui-emulator-test.log
-# Avoid combining the UI encoder with three heavy ONNX and one media
+# Avoid combining the UI encoder with heavy ONNX and media
 # preflight tests in a single instrumented app process.
 adb shell am force-stop com.kp.movierecap || true
 sleep 2
@@ -21,7 +21,7 @@ adb shell am instrument -w -r \
   -e class com.kp.movierecap.NarratedRecapInstrumentedTest \
   com.kp.movierecap.test/androidx.test.runner.AndroidJUnitRunner \
   | tee /tmp/kp-media-emulator-test.log
-grep -E 'OK \\(4 tests\\)' /tmp/kp-media-emulator-test.log
+grep -E 'OK \\(5 tests\\)' /tmp/kp-media-emulator-test.log
 
 echo "[KP Recap] Pulling proof MP4 and WAV from Android private test cache"
 adb exec-out run-as com.kp.movierecap cat cache/kp_ci_narrated.mp4 > kp-emulator-narrated-proof.mp4
@@ -36,8 +36,6 @@ if adb shell run-as com.kp.movierecap ls cache/kp_friendly_studio_ui.png >/dev/n
   adb exec-out run-as com.kp.movierecap cat cache/kp_friendly_studio_ui.png > kp-friendly-ui-screen.png
   test -s kp-friendly-ui-screen.png
 fi
-echo "[KP Recap] Checking instrumentation assertion summary"
-grep -E 'OK \(5 tests\)' /tmp/kp-emulator-test.log
 if adb shell run-as com.kp.movierecap ls cache/kp_webview_render.png >/dev/null 2>&1; then
   adb exec-out run-as com.kp.movierecap cat cache/kp_webview_render.png > kp-webview-render.png
 fi
