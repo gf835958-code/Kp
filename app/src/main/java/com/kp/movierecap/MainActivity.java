@@ -93,6 +93,16 @@ public final class MainActivity extends Activity {
         settings.setMixedContentMode(WebSettings.MIXED_CONTENT_NEVER_ALLOW);
         settings.setSafeBrowsingEnabled(true);
         webView.setWebViewClient(new WebViewClient() {
+            @Override public void onPageFinished(WebView view, String url) {
+                // WebView page-ready can precede the first visible raster frame
+                // on some Android 15 / headless graphics configurations.
+                view.postVisualStateCallback(1L, requestId -> view.post(() -> {
+                    if (view.isAttachedToWindow()) {
+                        view.requestLayout();
+                        view.invalidate();
+                    }
+                }));
+            }
             @Override public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
                 // The app has no external navigation; this also keeps the JS bridge local.
                 return true;
