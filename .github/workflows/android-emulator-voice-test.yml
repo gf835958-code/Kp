@@ -98,6 +98,10 @@ jobs:
         run: |
           test -s kp-emulator-narrated-proof.mp4
           test -s kp-emulator-burmese-proof.wav
+          test "$(wc -c < kp-emulator-burmese-proof.wav)" -gt 10000
+          head -c 4 kp-emulator-burmese-proof.wav | grep -q RIFF
+          ffprobe -v error -select_streams a:0 -show_entries stream=codec_name \
+            -of default=noprint_wrappers=1 kp-emulator-burmese-proof.wav | grep -q codec_name=pcm_s16le
           ffprobe -v error -select_streams v:0 -show_entries stream=codec_name \
             -of default=noprint_wrappers=1 kp-emulator-narrated-proof.mp4 | grep -q codec_name=
           ffprobe -v error -select_streams a:0 -show_entries stream=codec_name \
