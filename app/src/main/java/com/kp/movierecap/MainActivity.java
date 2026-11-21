@@ -69,6 +69,18 @@ public final class MainActivity extends Activity {
     private volatile boolean ttsReady = false;
     private volatile boolean exporting = false;
     private CaptionedVideoExporter captionedExporter;
+    private volatile int exportGeneration = 0;
+    private volatile boolean exportCancelRequested = false;
+    private boolean isExportCancelled(int job) {
+        return exportCancelRequested || exportGeneration != job;
+    }
+    private void finishCancelledExport(int job) {
+        if (exportGeneration == job) {
+            exporting = false;
+            autoExportFeedback(false, "Video ဖန်တီးမှုကို ရပ်လိုက်ပါပြီ။");
+        }
+    }
+
 
     @SuppressLint({"SetJavaScriptEnabled", "JavascriptInterface"})
     @Override public void onCreate(Bundle state) {
@@ -297,7 +309,7 @@ public final class MainActivity extends Activity {
      * No Android device TTS, transcript, or speech alignment is implied here.
      * Media3 must start on the main thread; its callback is also on that thread. */
     private void exportCaptionedToMovies(List<VideoHighlightsExporter.Range> ranges,
-            List<String> captions) {
+            List<String> captions, int job) {
         if (Build.VERSION.SDK_INT < 29) {
             exporting = false;
             autoExportFeedback(false, "Auto subtitle export requires Android 10 or newer.");
@@ -309,45 +321,84 @@ public final class MainActivity extends Activity {
             autoExportFeedback(false, "Video file ကို အရင်ရွေးပါ။");
             return;
         }
-        final File output = new File(getCacheDir(), "kp_captioned_working.mp4");
-        // Never synthesize a long movie on the UI thread.
+        // Unique MP4 and WAV paths prevent a cancelled job from clobbering
+        // a later export started after its Media3 encoder has been released.
+        final File output = new File(getCacheDir(), "kp_captioned_" + job + ".mp4");
         io.execute(() -> {
+            if (isExportCancelled(job)) {
+                finishCancelledExport(job);
+                return;
+            }
             final File speech;
             try {
                 MovieExportPreflight.verify(MainActivity.this, source, ranges);
-                speech = BurmeseNarration.generate(MainActivity.this, captions, ranges);
+                if (isExportCancelled(job)) {
+                    finishCancelledExport(job);
+                    return;
+                }
+                speech = BurmeseNarration.generate(MainActivity.this, captions, ranges, job);
             } catch (Exception | UnsatisfiedLinkError e) {
-                exporting = false;
-                autoExportFeedback(false, "Video / မြန်မာအသံ မဖန်တီးနိုင်ပါ: " + e.getMessage());
+                if (isExportCancelled(job)) {
+                    finishCancelledExport(job);
+                } else {
+                    exporting = false;
+                    autoExportFeedback(false, "Video / မြန်မာအသံ မဖန်တီးနိုင်ပါ: " + e.getMessage());
+                }
+                return;
+            }
+            if (isExportCancelled(job)) {
+                speech.delete();
+                finishCancelledExport(job);
                 return;
             }
             runOnUiThread(() -> {
+                if (isExportCancelled(job)) {
+                    speech.delete();
+                    finishCancelledExport(job);
+                    return;
+                }
                 try {
-                    captionedExporter = new CaptionedVideoExporter();
-                    captionedExporter.start(this, source, ranges, captions, speech, output,
+                    CaptionedVideoExporter current = new CaptionedVideoExporter();
+                    captionedExporter = current;
+                    current.start(this, source, ranges, captions, speech, output,
                         new CaptionedVideoExporter.Callback() {
                             @Override public void onProgress(int percent) {
-                                reportNativeExportProgress(percent);
+                                if (!isExportCancelled(job))
+                                    reportNativeExportProgress(percent);
                             }
                             @Override public void onSuccess(File encoded) {
-                                captionedExporter = null;
+                                if (captionedExporter == current) captionedExporter = null;
                                 speech.delete();
-                                saveCaptionedToMovies(encoded);
+                                if (isExportCancelled(job)) {
+                                    encoded.delete();
+                                    finishCancelledExport(job);
+                                    return;
+                                }
+                                saveCaptionedToMovies(encoded, job);
                             }
                             @Override public void onFailure(Exception error) {
-                                captionedExporter = null;
+                                if (captionedExporter == current) captionedExporter = null;
                                 speech.delete();
+                                if (isExportCancelled(job)) {
+                                    output.delete();
+                                    finishCancelledExport(job);
+                                    return;
+                                }
                                 exporting = false;
                                 autoExportFeedback(false,
                                     "Narrated MP4 error: " + error.getMessage());
                             }
                         });
                 } catch (Exception e) {
-                    captionedExporter = null;
+                    if (captionedExporter != null) captionedExporter = null;
                     speech.delete();
-                    exporting = false;
                     output.delete();
-                    autoExportFeedback(false, "Media3 render could not start: " + e.getMessage());
+                    if (isExportCancelled(job)) {
+                        finishCancelledExport(job);
+                    } else {
+                        exporting = false;
+                        autoExportFeedback(false, "Media3 render could not start: " + e.getMessage());
+                    }
                 }
             });
         });
