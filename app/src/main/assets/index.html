@@ -86,9 +86,18 @@ button:disabled{opacity:.58}
 #toast{background:#2c2d49;color:#fff;font-size:13px;bottom:calc(18px + env(safe-area-inset-bottom));padding:12px 16px}
 .btn:focus-visible,.drop:focus-visible,textarea:focus-visible,input:focus-visible,select:focus-visible{outline:3px solid #a296f5;outline-offset:2px}
 @media(max-width:760px){
+  /* Keep primary picker and action close on narrow Android screens. */
+  .hero{padding:12px 0 13px;gap:5px}
+  .hero h1{font-size:clamp(23px,7vw,28px);line-height:1.38}
+  .hero p{font-size:12px;line-height:1.65}
+  .flow-steps{margin-top:2px}
+  .drop{padding:14px 12px}
+  .uploadpic{height:48px;width:48px;border-radius:16px;font-size:24px;margin-bottom:6px}
+  .drop small{margin-bottom:8px}
+  .card .sub{margin-bottom:10px}
   .app{padding:0 14px 60px}
   .workspace{grid-template-columns:minmax(0,1fr);gap:15px}
-  .hero{padding:26px 0 21px}.hero h1{font-size:30px;line-height:1.6}
+  /* keep compact hero defaults above */
   .hero p{font-size:13px}
   .card{padding:18px 16px;border-radius:20px}
   .brand b{font-size:15px}.brand small{font-size:10px}
@@ -142,7 +151,7 @@ function toast(msg){$('toast').textContent=msg;$('toast').style.display='block';
 function formatTime(s){if(!Number.isFinite(s))return '00:00';let x=Math.max(0,Math.floor(s));return String(Math.floor(x/60)).padStart(2,'0')+':'+String(x%60).padStart(2,'0')}
 $('choose').onclick=e=>{e.stopPropagation();$('file').click()};$('drop').onclick=e=>{if(e.target.id==='choose')return;$('file').click()};$('drop').onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();$('file').click()}};
 $('drop').ondragover=e=>{e.preventDefault();$('drop').classList.add('drag')};$('drop').ondragleave=()=>$('drop').classList.remove('drag');$('drop').ondrop=e=>{e.preventDefault();$('drop').classList.remove('drag');if(e.dataTransfer.files.length)loadFile(e.dataTransfer.files[0])};$('file').onchange=e=>{if(e.target.files.length)loadFile(e.target.files[0])};
-function loadFile(file){lastNativeDuration=0;if(!file.type.startsWith('video/'))return toast('Video File ကိုပဲ ရွေးပေးပါ။');demoMode=false;if(objectUrl)URL.revokeObjectURL(objectUrl);currentFile=file;objectUrl=URL.createObjectURL(file);$('preview').src=objectUrl;$('autoBtn').disabled=false;$('exportResult').hidden=true;$('progress').style.display='none';$('autoBtn').textContent='✨ မြန်မာအသံ Video ဖန်တီးမယ်';$('videoWrap').style.display='block';$('fileMeta').textContent=file.name+' • '+(file.size/1048576).toFixed(1)+' MB';shotList=[];fullFilmDialogueEvidence=[];renderShots();$('script').value='';autoStatus('✅ Video ရွေးပြီးပါပြီ။ မြန်မာအသံ Video ဖန်တီးမယ် ခလုတ်ကို နှိပ်ပါ။','ready');toast('Video ရွေးပြီးပါပြီ။')}
+function loadFile(file){lastNativeDuration=0;if(!file.type.startsWith('video/'))return toast('Video File ကိုပဲ ရွေးပေးပါ။');demoMode=false;if(objectUrl)URL.revokeObjectURL(objectUrl);currentFile=file;objectUrl=URL.createObjectURL(file);$('preview').src=objectUrl;$('autoBtn').disabled=false;$('exportResult').hidden=true;$('progress').style.display='none';$('autoBtn').textContent='✨ မြန်မာအသံ Video ဖန်တီးမယ်';$('videoWrap').style.display='block';$('fileMeta').textContent=file.name+' • '+(file.size/1048576).toFixed(1)+' MB';shotList=[];fullFilmDialogueEvidence=[];renderShots();$('script').value='';autoStatus('✅ Video ရွေးပြီးပါပြီ။ မြန်မာအသံ Video ဖန်တီးမယ် ခလုတ်ကို နှိပ်ပါ။','ready');toast('Video ရွေးပြီးပါပြီ။');$('autoBtn').scrollIntoView({block:'center',behavior:'smooth'});}
 const demoBurmese = [
   'ဇာတ်လမ်းစမ်းသပ်မှုမှာ အရောင်တစ်ခုနဲ့ ပထမမြင်ကွင်း စတင်လာပါတယ်။',
   'နောက်ထပ်မြင်ကွင်းမှာ အရောင်ပြောင်းလဲပြီး ဇာတ်ကြောင်းတစ်ခု ဆက်သွားပါတယ်။',
