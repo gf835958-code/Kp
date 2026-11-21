@@ -92,7 +92,11 @@ public final class OneClickRecapUiInstrumentedTest {
                     Field ref = MainActivity.class.getDeclaredField("webView");
                     ref.setAccessible(true);
                     WebView view = (WebView) ref.get(activity);
-                    view.postVisualStateCallback(123L, id -> painted.countDown());
+                    view.postVisualStateCallback(123L, new WebView.VisualStateCallback() {
+                        @Override public void onComplete(long requestId) {
+                            painted.countDown();
+                        }
+                    });
                 } catch (Exception e) { throw new AssertionError(e); }
             });
             assertTrue("WebView never committed a visual frame",
