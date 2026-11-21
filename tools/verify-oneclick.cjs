@@ -143,4 +143,22 @@ assert.ok(activity.includes('void reportNativeExportProgress('),'Native render p
 assert.ok(captioned.includes('current.getProgress(progress)'),'Media3 actual progress polling missing');
 assert.ok(script.includes("setProgress($('autoBtn').disabled?82:100"),
   'Scan must not report 100% for whole one-click MP4 pipeline');
+
+assert.ok(html.includes('id="cancelBtn"') && html.includes('type="button" class="btn alt cancel-action" hidden'),
+  'One-click app missing a safe hidden-until-active cancel button');
+assert.ok(script.includes('cancelRequestedJS=true') &&
+  script.includes('function stopCancelledGeneration()'),
+  'Must allow cancelling a scan before starting MP4 export');
+assert.ok(script.includes("AndroidRecap.cancelCurrentExport()"),
+  'Cancel button not connected to native Android export');
+assert.ok(activity.includes('void cancelCurrentExport()') &&
+  activity.includes('isExportCancelled(job)'),
+  'Android export must reject stale results after cancellation');
+const media=fs.readFileSync('app/src/main/java/com/kp/movierecap/CaptionedVideoExporter.java','utf8');
+assert.ok(media.includes('public void cancel()') &&
+  media.includes('active.cancel()'),
+  'Media3 encoder must support real cancel, not only hiding a spinner');
+assert.ok(voice.includes('int exportId') &&
+  activity.includes('captions, ranges, job'),
+  'Concurrent cancelled and new jobs must not share the voice WAV filename');
 console.log('PASS: JavaScript syntax, native 30min scene planning, distributed dialogue coverage, silent-audio guard, narrated MP4 wiring');
