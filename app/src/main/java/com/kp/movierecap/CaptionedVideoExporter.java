@@ -4,6 +4,8 @@ import android.content.Context;
 import android.net.Uri;
 import android.graphics.Color;
 import android.media.MediaMetadataRetriever;
+import android.os.Handler;
+import android.os.Looper;
 import java.text.BreakIterator;
 import java.util.Locale;
 import android.net.Uri;
@@ -22,6 +24,7 @@ import androidx.media3.transformer.EditedMediaItem;
 import androidx.media3.transformer.EditedMediaItemSequence;
 import androidx.media3.transformer.ExportException;
 import androidx.media3.transformer.ExportResult;
+import androidx.media3.transformer.ProgressHolder;
 import androidx.media3.transformer.Transformer;
 import java.io.File;
 import java.util.ArrayList;
@@ -33,8 +36,11 @@ public final class CaptionedVideoExporter {
     public interface Callback {
         void onSuccess(File output);
         void onFailure(Exception exception);
+        default void onProgress(int percentage) { }
     }
     private Transformer transformer;
+    private final Handler progressHandler = new Handler(Looper.getMainLooper());
+    private Runnable progressPoller;
     /** Video-scaled Burmese caption rendering with grapheme-aware line wraps. */
     private static int[] sourceSize(Context context, Uri input) {
         MediaMetadataRetriever reader = new MediaMetadataRetriever();
@@ -141,16 +147,35 @@ public final class CaptionedVideoExporter {
         transformer = new Transformer.Builder(context)
             .addListener(new Transformer.Listener() {
                 @Override public void onCompleted(Composition composition, ExportResult result) {
+                    if (progressPoller != null) progressHandler.removeCallbacks(progressPoller);
                     transformer = null;
                     callback.onSuccess(output);
                 }
                 @Override public void onError(Composition composition, ExportResult result,
                         ExportException exception) {
+                    if (progressPoller != null) progressHandler.removeCallbacks(progressPoller);
                     transformer = null;
                     if (output.exists()) output.delete();
                     callback.onFailure(exception);
                 }
             }).build();
         transformer.start(composition, output.getAbsolutePath());
+        // Query REAL Media3 render percentage; never show fake completion
+        // just because scanning / transcription has finished.
+        final ProgressHolder progress = new ProgressHolder();
+        progressPoller = new Runnable() {
+            @Override public void run() {
+                Transformer current = transformer;
+                if (current == null) return;
+                try {
+                    int state = current.getProgress(progress);
+                    if (state == Transformer.PROGRESS_STATE_AVAILABLE)
+                        callback.onProgress(Math.max(0, Math.min(99, progress.progress)));
+                } catch (RuntimeException ignored) { /* some codecs don't expose progress */ }
+                if (transformer == current)
+                    progressHandler.postDelayed(this, 800);
+            }
+        };
+        progressHandler.post(progressPoller);
     }
 }
