@@ -44,10 +44,22 @@ assert.equal(sourceScenes[0].dialogueEvidenceList.length,1,'Nearby Burmese dialo
 assert.equal(ctx.addSourceDialogue({time:26,lang:'my',text:'မင်္ဂလာပါ။'},sourceScenes,sourceEvidence),false,'Deduplicate source utterance at same timestamp');
 
 ctx.visualDict={person:'လူ',house:'အိမ်'};
-vm.runInContext(functionSource('briefGroundedNarration'),ctx);
+vm.runInContext(functionSource('shortBurmeseText')+'\n'+functionSource('briefGroundedNarration'),ctx);
 const emptyNarration=ctx.briefGroundedNarration({labels:[],dialogueEvidenceList:[]});
 assert.ok(emptyNarration.length<60 && /[\u1000-\u109f]/.test(emptyNarration),
   'Unknown image must not invent a movie plot or create a long caption');
+const realBurmeseCue={time:27,lang:'my',text:'တကယ့် မြန်မာစာတန်းတစ်ကြောင်း ဖြစ်ပါတယ်။'};
+const realCueCaption=ctx.briefGroundedNarration({labels:[]},24,36,[realBurmeseCue]);
+assert.ok(realCueCaption.includes('မြန်မာစာတန်း'), 'Video must use actual Burmese embedded cue when its timestamp matches');
+const otherClipCaption=ctx.briefGroundedNarration({labels:[]},90,102,[realBurmeseCue]);
+assert.ok(!otherClipCaption.includes('မြန်မာစာတန်း'), 'Never attach embedded subtitle to unrelated time range');
+const originalEnglishCue=ctx.briefGroundedNarration({labels:[]},24,36,[{time:27,lang:'en',text:'The map is inside the house.'}]);
+assert.ok(!originalEnglishCue.includes('map'), 'Do not pretend English embedded subtitles are Burmese translation');
+assert.ok(activity.includes('scanEmbeddedSubtitlesNative()'), 'Optional native embedded subtitles bridge missing');
+assert.ok(script.includes('await scanEmbeddedSubtitleContext()'),'One-click native scan must use embedded text subtitle evidence');
+const subtitleBackend=fs.readFileSync('app/src/main/java/com/kp/movierecap/MovieSubtitleExtractor.java','utf8');
+assert.ok(subtitleBackend.includes('MediaExtractor') && subtitleBackend.includes('application/x-subrip') &&
+  subtitleBackend.includes('text/vtt'), 'Offline embedded subtitles extractor missing');
 const grounded=ctx.briefGroundedNarration({
   labels:[{label:'person',confidence:.9}],dialogueEvidenceList:[
     {lang:'en',text:'I found a map, said John.'}
