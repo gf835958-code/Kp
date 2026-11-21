@@ -5,11 +5,23 @@ echo "[KP Recap] Installing the app and instrumentation APK"
 adb install -r app/build/outputs/apk/debug/app-debug.apk
 adb install -r app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
 
-echo "[KP Recap] Running Burmese ONNX TTS + Media3 MP4 instrumentation"
+echo "[KP Recap] Running UI one-click MP4 test in a clean instrumentation process"
 adb shell am instrument -w -r \
-  -e class com.kp.movierecap.NarratedRecapInstrumentedTest,com.kp.movierecap.OneClickRecapUiInstrumentedTest \
+  -e class com.kp.movierecap.OneClickRecapUiInstrumentedTest \
   com.kp.movierecap.test/androidx.test.runner.AndroidJUnitRunner \
-  | tee /tmp/kp-emulator-test.log
+  | tee /tmp/kp-ui-emulator-test.log
+grep -E 'OK \\(1 test\\)' /tmp/kp-ui-emulator-test.log
+# Avoid combining the UI encoder with three heavy ONNX and one media
+# preflight tests in a single instrumented app process.
+adb shell am force-stop com.kp.movierecap || true
+sleep 2
+
+echo "[KP Recap] Running native scene scan, ASR, Burmese TTS, export and validation"
+adb shell am instrument -w -r \
+  -e class com.kp.movierecap.NarratedRecapInstrumentedTest \
+  com.kp.movierecap.test/androidx.test.runner.AndroidJUnitRunner \
+  | tee /tmp/kp-media-emulator-test.log
+grep -E 'OK \\(4 tests\\)' /tmp/kp-media-emulator-test.log
 
 echo "[KP Recap] Pulling proof MP4 and WAV from Android private test cache"
 adb exec-out run-as com.kp.movierecap cat cache/kp_ci_narrated.mp4 > kp-emulator-narrated-proof.mp4
