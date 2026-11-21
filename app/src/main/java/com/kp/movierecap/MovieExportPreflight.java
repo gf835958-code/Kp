@@ -78,6 +78,29 @@ public final class MovieExportPreflight {
         if (external != null) ensureFree(external, estimatedBytes);
     }
 
+    /** A saved recap is only successful when it is a readable MP4 with
+     * BOTH an encoded video track and the Burmese narration audio track. */
+    public static void verifyOutput(File mp4) throws Exception {
+        if (mp4 == null || !mp4.isFile() || mp4.length() < 4096)
+            throw new IOException("MP4 Video ဖိုင်မပြည့်စုံပါ။");
+        MediaExtractor result = new MediaExtractor();
+        try {
+            result.setDataSource(mp4.getAbsolutePath());
+            boolean video = false, audio = false;
+            for (int i = 0; i < result.getTrackCount(); i++) {
+                MediaFormat track = result.getTrackFormat(i);
+                String mime = track.getString(MediaFormat.KEY_MIME);
+                if (mime == null) continue;
+                if (mime.startsWith("video/")) video = true;
+                if (mime.startsWith("audio/")) audio = true;
+            }
+            if (!video || !audio)
+                throw new IOException("ထုတ်ထားသော MP4 မှာ Video သို့မဟုတ် မြန်မာအသံ မပါပါ။");
+        } finally {
+            result.release();
+        }
+    }
+
     private static void ensureFree(File directory, long bytesNeeded) throws IOException {
         if (directory == null || !directory.exists())
             throw new IOException("Video သိမ်းမည့် Storage မရပါ။");
