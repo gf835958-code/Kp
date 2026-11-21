@@ -16,6 +16,10 @@ adb exec-out run-as com.kp.movierecap cat cache/kp_ci_narrated.mp4 > kp-emulator
 adb exec-out run-as com.kp.movierecap cat cache/kp_ci_narration_proof.wav > kp-emulator-burmese-proof.wav
 test -s kp-emulator-narrated-proof.mp4
 test -s kp-emulator-burmese-proof.wav
+# A fake proof can contain `cat: ... No such file` instead of WAV bytes.
+# Require the actual RIFF signature and a substantial PCM payload.
+test "$(wc -c < kp-emulator-burmese-proof.wav)" -gt 10000
+head -c 4 kp-emulator-burmese-proof.wav | grep -q RIFF
 if adb shell run-as com.kp.movierecap ls cache/kp_friendly_studio_ui.png >/dev/null 2>&1; then
   adb exec-out run-as com.kp.movierecap cat cache/kp_friendly_studio_ui.png > kp-friendly-ui-screen.png
   test -s kp-friendly-ui-screen.png
