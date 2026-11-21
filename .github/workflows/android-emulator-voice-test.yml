@@ -74,6 +74,23 @@ jobs:
             -c:a aac -ar 16000 -af apad -movflags +faststart \
             app/src/androidTest/assets/kp-smoke.mp4
           test -s app/src/androidTest/assets/kp-smoke.mp4
+          # Original Burmese text cues muxed into an MP4 timed-text track.
+          cat > app/src/androidTest/assets/kp-subtitle.srt <<'SUB'
+          1
+          00:00:02,000 --> 00:00:05,000
+          မင်္ဂလာပါ။
+
+          2
+          00:00:06,000 --> 00:00:10,000
+          မြေပုံကို ရှာဖွေနေသည်။
+          SUB
+          ffmpeg -hide_banner -loglevel error -y \
+            -f lavfi -i color=c=blue:s=128x72:r=2 \
+            -i app/src/androidTest/assets/kp-subtitle.srt -t 12 \
+            -c:v libx264 -pix_fmt yuv420p -r 2 -g 2 -crf 42 \
+            -c:s mov_text -movflags +faststart \
+            app/src/androidTest/assets/kp-subtitle.mp4
+          test -s app/src/androidTest/assets/kp-subtitle.mp4
           # A true silent AAC soundtrack, not a no-audio movie.
           ffmpeg -hide_banner -loglevel error -y \
             -f lavfi -i color=c=black:s=128x72:r=2 \
