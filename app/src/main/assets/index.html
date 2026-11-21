@@ -15,6 +15,9 @@ body.show-advanced main.workspace>.stack:nth-child(2){flex-direction:column}
 body.show-advanced #scanBtn{display:block!important}
 .visualnote{min-height:54px;border:1px solid #303e5b;background:#101627;color:#d6e1fb;border-radius:8px;padding:8px;font-size:12px;line-height:1.7}
 /* KP Friendly Studio v0.11 — calm mobile-first UI, offline fonts, legible Myanmar */
+.cancel-action{display:block;width:100%;margin-top:8px;color:#8b2d42!important;background:#fff2f3!important;border:1px solid #f0c8d0!important;font-size:13px}
+.cancel-action:disabled{opacity:.55}
+
 :root{--bg:#f7f8fd;--panel:#fff;--line:#e4e8f4;--muted:#53637e;--txt:#182139;--p:#7360e9;--c:#177b84;--glow:rgba(115,96,233,.15)}
 html{color-scheme:light;scroll-behavior:smooth}
 body{background:radial-gradient(ellipse 65% 22% at 95% -7%,#e9e4ff 0%,transparent 90%),linear-gradient(180deg,#fbfaff,#f7f8fd 50%,#f4f8fa);color:var(--txt);font-family:'Noto Sans Myanmar',system-ui,-apple-system,sans-serif;font-size:15px;line-height:1.8}
@@ -131,6 +134,7 @@ button:disabled{opacity:.58}
   <button id="openVideo" type="button" class="btn open-video">▶ ဖွင့်ကြည့်မယ်</button>
  </section>
 <div id="progress" role="group" aria-label="Video ဖန်တီးမှု အခြေအနေ"><div class="bar"><i id="progBar"></i></div><div id="progTxt" class="progress-label" aria-live="polite">စစ်ဆေးနေပါတယ်…</div></div>
+<button id="cancelBtn" type="button" class="btn alt cancel-action" hidden>✕ ဖန်တီးတာ ရပ်မယ်</button>
 <div class="video-wrap" id="videoWrap"><video controls playsinline id="preview"></video><div class="meta" id="fileMeta"></div></div><button id="detailsToggle" class="btn alt small advanced-toggle" type="button" aria-expanded="false">⚙️ အသေးစိတ်ကြည့်ရန် ▾</button>
 <div class="fields" id="advancedFields"><div class="field"><label for="lang">Script Language</label><select id="lang"><option value="my">🇲🇲 မြန်မာ</option><option value="en">🇬🇧 English</option></select></div><div class="field"><label for="ratio">Output Frame</label><select id="ratio"><option>Original (no crop)</option></select></div><div class="field"><label for="maxScenes">Maximum Scenes</label><select id="maxScenes"><option value="6">6 scenes • Quick</option><option value="10" selected>10 scenes • Standard</option><option value="16">16 scenes • Detailed</option></select></div><div class="field"><label for="target">Highlight Clip Length</label><select id="target"><option value="8">8 Seconds</option><option value="12" selected>12 Seconds</option><option value="15">15 Seconds</option></select></div></div><button id="scanBtn" class="btn teal" style="display:none;width:100%">✦ Scan Video Scenes</button><p class="hint honesty-note">ℹ️ <strong>လက်ရှိ စမ်းသပ် Version</strong> က မြင်ကွင်းအချက်အလက်တွေကို ဖော်ပြနိုင်ပါတယ်။ ဇာတ်လမ်းတစ်ကားလုံးကို နားလည်ပြီး မှန်ကန်တဲ့ Recap ရေးတဲ့ AI မပြီးသေးပါ။</p></section>
 <section class="card"><h2><span class="step">2</span> မြင်ကွင်းများ</h2><p class="sub">AI မြင်ကွင်းထဲရှိ အရာဝတ္ထုတွေကို အလိုအလျောက် ခွဲခြားပါမယ်။ ဇာတ်လမ်းအပြည့် နားလည်ခြင်းတော့ မဟုတ်သေးပါ။</p><div class="stat" id="stats"><span>Scenes: 0</span><span>Ready to scan</span></div><div class="scenes" id="scenes"><div class="empty">🎞️<br>Video Scan လုပ်ပြီးရင် Scene Timeline ဒီမှာ ပေါ်ပါမယ်။</div></div></section>
@@ -145,13 +149,13 @@ button:disabled{opacity:.58}
 </main><div class="footer">KP Movie Recap Studio • Offline Studio v0.11 • No cloud upload</div></div>
 <div id="toast" role="status"></div>
 <script>
-const $=id=>document.getElementById(id);let currentFile=null,objectUrl=null,shotList=[],busy=false,demoMode=false;let labelWaiters=new Map();let lastNativeDuration=0;let nativeScanResolve=null;let nativeDialogueResolve=null;let fullFilmDialogueEvidence=[];
+const $=id=>document.getElementById(id);let currentFile=null,objectUrl=null,shotList=[],busy=false,demoMode=false;let labelWaiters=new Map();let lastNativeDuration=0;let nativeScanResolve=null;let nativeDialogueResolve=null;let fullFilmDialogueEvidence=[];let cancelRequestedJS=false,exportingNative=false;
 const fn=()=>currentFile?currentFile.name.replace(/\.[^.]+$/,''):'KP-Movie-Recap';
 function toast(msg){$('toast').textContent=msg;$('toast').style.display='block';clearTimeout(toast.t);toast.t=setTimeout(()=>$('toast').style.display='none',4000)}
 function formatTime(s){if(!Number.isFinite(s))return '00:00';let x=Math.max(0,Math.floor(s));return String(Math.floor(x/60)).padStart(2,'0')+':'+String(x%60).padStart(2,'0')}
 $('choose').onclick=e=>{e.stopPropagation();$('file').click()};$('drop').onclick=e=>{if(e.target.id==='choose')return;$('file').click()};$('drop').onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();$('file').click()}};
 $('drop').ondragover=e=>{e.preventDefault();$('drop').classList.add('drag')};$('drop').ondragleave=()=>$('drop').classList.remove('drag');$('drop').ondrop=e=>{e.preventDefault();$('drop').classList.remove('drag');if(e.dataTransfer.files.length)loadFile(e.dataTransfer.files[0])};$('file').onchange=e=>{if(e.target.files.length)loadFile(e.target.files[0])};
-function loadFile(file){lastNativeDuration=0;if(!file.type.startsWith('video/'))return toast('Video File ကိုပဲ ရွေးပေးပါ။');demoMode=false;if(objectUrl)URL.revokeObjectURL(objectUrl);currentFile=file;objectUrl=URL.createObjectURL(file);$('preview').src=objectUrl;$('autoBtn').disabled=false;$('exportResult').hidden=true;$('progress').style.display='none';$('autoBtn').textContent='✨ မြန်မာအသံ Video ဖန်တီးမယ်';$('videoWrap').style.display='block';$('fileMeta').textContent=file.name+' • '+(file.size/1048576).toFixed(1)+' MB';shotList=[];fullFilmDialogueEvidence=[];renderShots();$('script').value='';autoStatus('✅ Video ရွေးပြီးပါပြီ။ မြန်မာအသံ Video ဖန်တီးမယ် ခလုတ်ကို နှိပ်ပါ။','ready');toast('Video ရွေးပြီးပါပြီ။');$('autoBtn').scrollIntoView({block:'center',behavior:'smooth'});}
+function loadFile(file){lastNativeDuration=0;if(!file.type.startsWith('video/'))return toast('Video File ကိုပဲ ရွေးပေးပါ။');demoMode=false;if(objectUrl)URL.revokeObjectURL(objectUrl);currentFile=file;cancelRequestedJS=false;exportingNative=false;$('cancelBtn').hidden=true;$('cancelBtn').disabled=false;objectUrl=URL.createObjectURL(file);$('preview').src=objectUrl;$('autoBtn').disabled=false;$('exportResult').hidden=true;$('progress').style.display='none';$('autoBtn').textContent='✨ မြန်မာအသံ Video ဖန်တီးမယ်';$('videoWrap').style.display='block';$('fileMeta').textContent=file.name+' • '+(file.size/1048576).toFixed(1)+' MB';shotList=[];fullFilmDialogueEvidence=[];renderShots();$('script').value='';autoStatus('✅ Video ရွေးပြီးပါပြီ။ မြန်မာအသံ Video ဖန်တီးမယ် ခလုတ်ကို နှိပ်ပါ။','ready');toast('Video ရွေးပြီးပါပြီ။');$('autoBtn').scrollIntoView({block:'center',behavior:'smooth'});}
 const demoBurmese = [
   'ဇာတ်လမ်းစမ်းသပ်မှုမှာ အရောင်တစ်ခုနဲ့ ပထမမြင်ကွင်း စတင်လာပါတယ်။',
   'နောက်ထပ်မြင်ကွင်းမှာ အရောင်ပြောင်းလဲပြီး ဇာတ်ကြောင်းတစ်ခု ဆက်သွားပါတယ်။',
@@ -389,6 +393,9 @@ window.onNativeExportProgress=percent=>{
   setProgress(88+safe*.11,'MP4 Video ပေါင်းထုတ်နေပါတယ် '+Math.round(safe)+'%');
 };
 window.onAutoExportResult=(success,message)=>{
+  exportingNative=false;
+  $('cancelBtn').hidden=true;
+  $('cancelBtn').disabled=false;
   autoStatus((success?'✅ ':'❌ ')+message,success?'success':'error');
   $('autoBtn').disabled=false;
   $('autoBtn').textContent='✨ မြန်မာအသံ Video ဖန်တီးမယ်';
@@ -405,6 +412,21 @@ $('openVideo').onclick=()=>{
     AndroidRecap.openLastExportedVideo();
   else toast('Video ကို Files → Movies → KP Movie Recap မှာ ဖွင့်ကြည့်နိုင်ပါတယ်။');
 };
+$('cancelBtn').onclick=()=>{
+  cancelRequestedJS=true;
+  $('cancelBtn').disabled=true;
+  autoStatus('⏳ ဖန်တီးမှု ရပ်နေပါတယ်…','running');
+  if(exportingNative && window.AndroidRecap &&
+     typeof AndroidRecap.cancelCurrentExport==='function')
+    AndroidRecap.cancelCurrentExport();
+};
+function stopCancelledGeneration(){
+  $('cancelBtn').hidden=true;
+  $('cancelBtn').disabled=false;
+  $('autoBtn').disabled=false;
+  $('autoBtn').textContent='✨ မြန်မာအသံ Video ဖန်တီးမယ်';
+  autoStatus('ဖန်တီးမှုကို ရပ်လိုက်ပါပြီ။','ready');
+}
 $('detailsToggle').onclick=()=>{
  const show=document.body.classList.toggle('show-advanced');
  $('detailsToggle').setAttribute('aria-expanded',String(show));
@@ -414,26 +436,35 @@ $('autoBtn').onclick=async()=>{
   if(!currentFile) return toast('Movie Video ကို အရင်ရွေးပါ။');
   if(!window.AndroidRecap || typeof AndroidRecap.exportHighlightsAuto!=='function') return toast('One Click Export ကို Android APK မှာသာ ရနိုင်ပါတယ်။');
   if(busy || $('autoBtn').disabled) return;
+  cancelRequestedJS=false;
+  exportingNative=false;
+  $('cancelBtn').hidden=false;
+  $('cancelBtn').disabled=false;
   $('autoBtn').disabled=true;
   $('exportResult').hidden=true;
   $('autoBtn').textContent='⏳ ဖန်တီးနေပါတယ်…';
   autoStatus('🔎 မြင်ကွင်းနဲ့ အသံကို စစ်နေပါတယ်…','running');
   await $('scanBtn').onclick();
+  if(cancelRequestedJS)return stopCancelledGeneration();
   if(!shotList.length) {
     $('autoBtn').disabled=false;
+    $('cancelBtn').hidden=true;
     $('autoBtn').textContent='✨ မြန်မာအသံ Video ဖန်တီးမယ်';
     return autoStatus('❌ Video ကို မဖတ်နိုင်ပါ။ MP4 တစ်ခုနဲ့ ထပ်စမ်းပါ။','error');
   }
   const plan=buildAutoCaptionPlan();
   const clips=plan.clips;
-  if(!clips.length) { $('autoBtn').disabled=false;$('autoBtn').textContent='✨ မြန်မာအသံ Video ဖန်တီးမယ်';return autoStatus('❌ အသံထည့်နိုင်မယ့် Video အပိုင်းမရှိပါ။ နောက် Video တစ်ခု စမ်းပါ။','error'); }
+  if(!clips.length) { $('cancelBtn').hidden=true;$('autoBtn').disabled=false;$('autoBtn').textContent='✨ မြန်မာအသံ Video ဖန်တီးမယ်';return autoStatus('❌ အသံထည့်နိုင်မယ့် Video အပိုင်းမရှိပါ။ နောက် Video တစ်ခု စမ်းပါ။','error'); }
   autoStatus('🎬 မြန်မာအသံနဲ့ စာတန်းတွေကို Video ထဲ ပေါင်းထုတ်နေပါတယ်…','running');
   setProgress(86,'မြန်မာအသံဖန်တီးပြီး MP4 ပေါင်းထုတ်နေပါတယ်');
   try {
     if(typeof AndroidRecap.exportCaptionedAuto==='function') {
+      if(cancelRequestedJS)return stopCancelledGeneration();
+      exportingNative=true;
       AndroidRecap.exportCaptionedAuto(JSON.stringify(clips),JSON.stringify(plan.captions));
     } else {
       autoStatus('❌ ဒီ App မှာ Video Export Engine မရှိပါ။','error');
+      $('cancelBtn').hidden=true;
       $('autoBtn').disabled=false;
       $('autoBtn').textContent='✨ မြန်မာအသံ Video ဖန်တီးမယ်';
     }
