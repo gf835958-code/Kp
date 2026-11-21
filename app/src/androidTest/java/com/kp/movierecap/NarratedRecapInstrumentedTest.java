@@ -222,6 +222,24 @@ public final class NarratedRecapInstrumentedTest {
         assertTrue("Media3 MP4 export timed out", finished.await(180, TimeUnit.SECONDS));
         assertNull("Media3 export failed", problem.get());
         assertTrue("Output MP4 empty", out.length() > 3000);
+        MovieExportPreflight.verifyOutput(out);
+        File invalidMp4 = new File(app.getCacheDir(), "kp_ci_not_an_mp4.mp4");
+        try {
+            try (FileOutputStream fake = new FileOutputStream(invalidMp4)) {
+                fake.write("This is NOT an actual H264 AAC media file."
+                    .getBytes(java.nio.charset.StandardCharsets.UTF_8));
+            }
+            boolean rejected = false;
+            try {
+                MovieExportPreflight.verifyOutput(invalidMp4);
+            } catch (Exception expected) {
+                rejected = true;
+            }
+            assertTrue("Corrupt MP4 must not be reported as a completed export", rejected);
+        } finally {
+            invalidMp4.delete();
+        }
+
 
         MediaExtractor extractor = new MediaExtractor();
         try {
