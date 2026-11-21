@@ -86,6 +86,20 @@ public final class OneClickRecapUiInstrumentedTest {
                 } catch (Exception e) { throw new AssertionError(e); }
             });
             waitForWebView(scenario);
+            // Capture a real Android screen for visual QA. Screenshot failure
+            // must not hide useful functional test results.
+            try {
+                android.graphics.Bitmap frame = InstrumentationRegistry
+                    .getInstrumentation().getUiAutomation().takeScreenshot();
+                if (frame != null) {
+                    try (FileOutputStream screenshot = new FileOutputStream(
+                            new File(app.getCacheDir(), "kp_friendly_studio_ui.png"))) {
+                        frame.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, screenshot);
+                    }
+                    frame.recycle();
+                }
+            } catch (Exception ignored) { /* optional visual evidence */ }
+
             // Set an HTML input stub (only for WebView metadata). The native
             // selectedVideo still points to the real H264/AAC fixture.
             // The real one-click event handler, native scan, Whisper, ONNX
