@@ -41,6 +41,18 @@ public final class CaptionedVideoExporter {
     private Transformer transformer;
     private final Handler progressHandler = new Handler(Looper.getMainLooper());
     private Runnable progressPoller;
+    /** Cancel on the Android main thread; never report an incomplete MP4
+     * as a successful export. The caller owns scratch-file cleanup. */
+    public void cancel() {
+        if (progressPoller != null) {
+            progressHandler.removeCallbacks(progressPoller);
+            progressPoller = null;
+        }
+        Transformer active = transformer;
+        transformer = null;
+        if (active != null) active.cancel();
+    }
+
     /** Video-scaled Burmese caption rendering with grapheme-aware line wraps. */
     private static int[] sourceSize(Context context, Uri input) {
         MediaMetadataRetriever reader = new MediaMetadataRetriever();
