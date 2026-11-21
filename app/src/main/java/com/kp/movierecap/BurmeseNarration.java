@@ -22,12 +22,21 @@ public final class BurmeseNarration {
 
     public static File generate(Context context, List<String> captions,
             List<VideoHighlightsExporter.Range> ranges) throws Exception {
+        return generate(context, captions, ranges, 0);
+    }
+
+    /** Use a unique scratch WAV per queued export. A cancelled job must not
+     * overwrite the next job's live voice track. */
+    public static File generate(Context context, List<String> captions,
+            List<VideoHighlightsExporter.Range> ranges, int exportId) throws Exception {
+        if (exportId < 0) throw new IllegalArgumentException("Invalid export ID");
         if (captions == null || ranges == null || captions.size() != ranges.size()
                 || ranges.isEmpty() || ranges.size() > 16) {
             throw new IllegalArgumentException("Unmatched voice scene count");
         }
         OfflineTts tts = null;
-        File wav = new File(context.getCacheDir(), "kp_burmese_voice.wav");
+        File wav = new File(context.getCacheDir(), exportId == 0
+            ? "kp_burmese_voice.wav" : "kp_burmese_voice_" + exportId + ".wav");
         if (wav.exists() && !wav.delete())
             throw new IllegalStateException("Cannot replace voice file");
         try {
