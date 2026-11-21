@@ -59,6 +59,7 @@ public final class MainActivity extends Activity {
     private WebView webView;
     private android.webkit.ValueCallback<Uri[]> filePickerCallback;
     private volatile Uri selectedVideo;
+    private volatile Uri lastExportedVideo;
     private String pendingText;
     private List<VideoHighlightsExporter.Range> pendingRanges;
     private File pendingAudio;
@@ -71,10 +72,12 @@ public final class MainActivity extends Activity {
     @SuppressLint({"SetJavaScriptEnabled", "JavascriptInterface"})
     @Override public void onCreate(Bundle state) {
         super.onCreate(state);
-        getWindow().setStatusBarColor(0xFF080B18);
-        getWindow().setNavigationBarColor(0xFF080B18);
+        getWindow().setStatusBarColor(0xFFF7F8FD);
+        getWindow().getDecorView().setSystemUiVisibility(
+            View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR | View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR);
+        getWindow().setNavigationBarColor(0xFFF7F8FD);
         webView = new WebView(this);
-        webView.setBackgroundColor(0xFF080B18);
+        webView.setBackgroundColor(0xFFF7F8FD);
         webView.setLayoutParams(new ViewGroup.LayoutParams(-1, -1));
         setContentView(webView);
 
@@ -358,6 +361,7 @@ public final class MainActivity extends Activity {
                 ContentValues done = new ContentValues();
                 done.put(MediaStore.Video.Media.IS_PENDING, 0);
                 getContentResolver().update(output, done, null, null);
+                lastExportedVideo = output;
                 autoExportFeedback(true, "မြန်မာအသံနဲ့ Scene စာတန်းပါတဲ့ MP4 ကို Movies/KP Movie Recap/ ထဲ သိမ်းပြီးပါပြီ။");
             } catch (Exception e) {
                 if (output != null) {
@@ -552,6 +556,25 @@ public final class MainActivity extends Activity {
                 if (result != TextToSpeech.SUCCESS) feedback("TTS အသံထုတ်လို့ မရပါ။");
             });
         }
+        /** Open only the last MP4 that this application inserted into MediaStore.
+         * The UI never supplies arbitrary file paths or external URLs here. */
+        @JavascriptInterface public void openLastExportedVideo() {
+            runOnUiThread(() -> {
+                Uri video = lastExportedVideo;
+                if (video == null) {
+                    feedback("ဖွင့်ကြည့်ရန် သိမ်းပြီးသား Video မရှိသေးပါ။"); return;
+                }
+                try {
+                    Intent view = new Intent(Intent.ACTION_VIEW);
+                    view.setDataAndType(video, "video/mp4");
+                    view.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+                    startActivity(Intent.createChooser(view, "Video ဖွင့်ကြည့်ရန်"));
+                } catch (Exception e) {
+                    feedback("Video ဖွင့်မရပါ။ Files > Movies > KP Movie Recap မှာ ရှာပါ။");
+                }
+            });
+        }
+
         @JavascriptInterface public void exportCaptionedAuto(String rangesJson,
                 String captionsJson) {
             runOnUiThread(() -> {
