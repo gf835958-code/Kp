@@ -151,6 +151,13 @@ public final class NarratedRecapInstrumentedTest {
             assertEquals("RIFF", new String(header, java.nio.charset.StandardCharsets.US_ASCII));
         }
 
+        // Save independent proof BEFORE the app's one-click export deletes the
+        // scratch WAV in its normal cleanup path. Never archive a missing file.
+        File voiceProof = new File(app.getCacheDir(), "kp_ci_narration_proof.wav");
+        java.nio.file.Files.copy(speech.toPath(), voiceProof.toPath(),
+            java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+        assertEquals("Copied WAV proof is incomplete", speech.length(), voiceProof.length());
+
         File out = new File(app.getCacheDir(), "kp_ci_narrated.mp4");
         if (out.exists()) out.delete();
         AtomicReference<Exception> problem = new AtomicReference<>();
