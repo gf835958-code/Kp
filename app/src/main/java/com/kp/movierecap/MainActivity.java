@@ -505,6 +505,15 @@ public final class MainActivity extends Activity {
         });
     }
 
+    private void reportNativeSubtitles(JSONObject payload, String error) {
+        runOnUiThread(() -> {
+            if (webView == null) return;
+            webView.evaluateJavascript("window.onNativeSubtitleResult(" +
+                (payload == null ? "null" : payload.toString()) + "," +
+                JSONObject.quote(error == null ? "" : error) + ")", null);
+        });
+    }
+
     private void reportNativeExportProgress(int percent) {
         final int safe = Math.max(0, Math.min(100, percent));
         runOnUiThread(() -> {
@@ -571,6 +580,26 @@ public final class MainActivity extends Activity {
                 try { reportNativeScan(NativeSceneScanner.sample(MainActivity.this, source, sceneCount), ""); }
                 catch (Exception e) {
                     reportNativeScan(null, e.getClass().getSimpleName() + ": " + e.getMessage());
+                }
+            });
+        }
+
+        /** Extract actual timed text when the selected file contains a
+         * platform-readable subtitle track. Unsupported/missing subtitles
+         * return empty evidence, never simulated or translated content. */
+        @JavascriptInterface public void scanEmbeddedSubtitlesNative() {
+            final Uri source = selectedVideo;
+            if (source == null) {
+                reportNativeSubtitles(null, "No video selected");
+                return;
+            }
+            io.execute(() -> {
+                try {
+                    reportNativeSubtitles(MovieSubtitleExtractor.read(
+                        MainActivity.this, source, 300), "");
+                } catch (Exception e) {
+                    reportNativeSubtitles(null,
+                        "Embedded subtitles unavailable: " + e.getMessage());
                 }
             });
         }
