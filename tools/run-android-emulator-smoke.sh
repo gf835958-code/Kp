@@ -13,7 +13,7 @@ adb shell am instrument -w -r \
 
 echo "[KP Recap] Pulling proof MP4 and WAV from Android private test cache"
 adb exec-out run-as com.kp.movierecap cat cache/kp_ci_narrated.mp4 > kp-emulator-narrated-proof.mp4
-adb exec-out run-as com.kp.movierecap cat cache/kp_burmese_voice.wav > kp-emulator-burmese-proof.wav
+adb exec-out run-as com.kp.movierecap cat cache/kp_ci_narration_proof.wav > kp-emulator-burmese-proof.wav
 test -s kp-emulator-narrated-proof.mp4
 test -s kp-emulator-burmese-proof.wav
 if adb shell run-as com.kp.movierecap ls cache/kp_friendly_studio_ui.png >/dev/null 2>&1; then
