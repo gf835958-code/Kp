@@ -149,13 +149,13 @@ button:disabled{opacity:.58}
 </main><div class="footer">KP Movie Recap Studio • Offline Studio v0.11 • No cloud upload</div></div>
 <div id="toast" role="status"></div>
 <script>
-const $=id=>document.getElementById(id);let currentFile=null,objectUrl=null,shotList=[],busy=false,demoMode=false;let labelWaiters=new Map();let lastNativeDuration=0;let nativeScanResolve=null;let nativeDialogueResolve=null;let fullFilmDialogueEvidence=[];let cancelRequestedJS=false,exportingNative=false;
+const $=id=>document.getElementById(id);let currentFile=null,objectUrl=null,shotList=[],busy=false,demoMode=false;let labelWaiters=new Map();let lastNativeDuration=0;let nativeScanResolve=null;let nativeDialogueResolve=null;let nativeSubtitleResolve=null;let fullFilmDialogueEvidence=[],fullFilmSubtitleEvidence=[];let cancelRequestedJS=false,exportingNative=false;
 const fn=()=>currentFile?currentFile.name.replace(/\.[^.]+$/,''):'KP-Movie-Recap';
 function toast(msg){$('toast').textContent=msg;$('toast').style.display='block';clearTimeout(toast.t);toast.t=setTimeout(()=>$('toast').style.display='none',4000)}
 function formatTime(s){if(!Number.isFinite(s))return '00:00';let x=Math.max(0,Math.floor(s));return String(Math.floor(x/60)).padStart(2,'0')+':'+String(x%60).padStart(2,'0')}
 $('choose').onclick=e=>{e.stopPropagation();$('file').click()};$('drop').onclick=e=>{if(e.target.id==='choose'||$('choose').disabled)return;$('file').click()};$('drop').onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();$('file').click()}};
 $('drop').ondragover=e=>{e.preventDefault();$('drop').classList.add('drag')};$('drop').ondragleave=()=>$('drop').classList.remove('drag');$('drop').ondrop=e=>{e.preventDefault();$('drop').classList.remove('drag');if(e.dataTransfer.files.length)loadFile(e.dataTransfer.files[0])};$('file').onchange=e=>{if(e.target.files.length)loadFile(e.target.files[0])};
-function loadFile(file){if(currentFile && $('autoBtn').disabled)return toast('Video ဖန်တီးနေစဉ် ဖိုင်အသစ်မရွေးနိုင်ပါ။');lastNativeDuration=0;if(!file.type.startsWith('video/'))return toast('Video File ကိုပဲ ရွေးပေးပါ။');demoMode=false;if(objectUrl)URL.revokeObjectURL(objectUrl);currentFile=file;cancelRequestedJS=false;exportingNative=false;$('cancelBtn').hidden=true;$('cancelBtn').disabled=false;objectUrl=URL.createObjectURL(file);$('preview').src=objectUrl;$('autoBtn').disabled=false;$('exportResult').hidden=true;$('progress').style.display='none';$('autoBtn').textContent='✨ မြန်မာအသံ Video ဖန်တီးမယ်';$('videoWrap').style.display='block';$('fileMeta').textContent=file.name+' • '+(file.size/1048576).toFixed(1)+' MB';shotList=[];fullFilmDialogueEvidence=[];renderShots();$('script').value='';autoStatus('✅ Video ရွေးပြီးပါပြီ။ မြန်မာအသံ Video ဖန်တီးမယ် ခလုတ်ကို နှိပ်ပါ။','ready');toast('Video ရွေးပြီးပါပြီ။');$('autoBtn').scrollIntoView({block:'center',behavior:'smooth'});}
+function loadFile(file){if(currentFile && $('autoBtn').disabled)return toast('Video ဖန်တီးနေစဉ် ဖိုင်အသစ်မရွေးနိုင်ပါ။');lastNativeDuration=0;if(!file.type.startsWith('video/'))return toast('Video File ကိုပဲ ရွေးပေးပါ။');demoMode=false;if(objectUrl)URL.revokeObjectURL(objectUrl);currentFile=file;cancelRequestedJS=false;exportingNative=false;$('cancelBtn').hidden=true;$('cancelBtn').disabled=false;objectUrl=URL.createObjectURL(file);$('preview').src=objectUrl;$('autoBtn').disabled=false;$('exportResult').hidden=true;$('progress').style.display='none';$('autoBtn').textContent='✨ မြန်မာအသံ Video ဖန်တီးမယ်';$('videoWrap').style.display='block';$('fileMeta').textContent=file.name+' • '+(file.size/1048576).toFixed(1)+' MB';shotList=[];fullFilmDialogueEvidence=[];fullFilmSubtitleEvidence=[];renderShots();$('script').value='';autoStatus('✅ Video ရွေးပြီးပါပြီ။ မြန်မာအသံ Video ဖန်တီးမယ် ခလုတ်ကို နှိပ်ပါ။','ready');toast('Video ရွေးပြီးပါပြီ။');$('autoBtn').scrollIntoView({block:'center',behavior:'smooth'});}
 const demoBurmese = [
   'ဇာတ်လမ်းစမ်းသပ်မှုမှာ အရောင်တစ်ခုနဲ့ ပထမမြင်ကွင်း စတင်လာပါတယ်။',
   'နောက်ထပ်မြင်ကွင်းမှာ အရောင်ပြောင်းလဲပြီး ဇာတ်ကြောင်းတစ်ခု ဆက်သွားပါတယ်။',
@@ -262,6 +262,63 @@ async function scanDialogueContext(){
     console.warn('Dialogue evidence unavailable:',err.message);
   }
 }
+window.onNativeSubtitleResult=(payload,error)=>{
+  if(nativeSubtitleResolve){
+    const callback=nativeSubtitleResolve;
+    nativeSubtitleResolve=null;
+    callback(payload,error||'');
+  }
+};
+async function scanEmbeddedSubtitleContext(){
+  if(!window.AndroidRecap || typeof AndroidRecap.scanEmbeddedSubtitlesNative!=='function'
+     || demoMode)return;
+  try{
+    const payload=await new Promise((resolve,reject)=>{
+      const timer=setTimeout(()=>{
+        nativeSubtitleResolve=null;
+        reject(Error('Embedded subtitle scan timed out'));
+      },20000);
+      nativeSubtitleResolve=(result,error)=>{
+        clearTimeout(timer);
+        if(error)reject(Error(error)); else resolve(result);
+      };
+      try{AndroidRecap.scanEmbeddedSubtitlesNative();}
+      catch(e){clearTimeout(timer);nativeSubtitleResolve=null;reject(e);}
+    });
+    const cues=Array.isArray(payload?.cues)?payload.cues:[];
+    const seen=new Set();
+    fullFilmSubtitleEvidence=[];
+    for(const cue of cues){
+      const time=Number(cue.time);
+      const words=String(cue.text||'').trim().slice(0,220);
+      if(!Number.isFinite(time)||time<0||words.length<3)continue;
+      const key=time.toFixed(1)+'|'+words;
+      if(seen.has(key))continue;
+      seen.add(key);
+      if(fullFilmSubtitleEvidence.length<300)
+        fullFilmSubtitleEvidence.push({
+          time,lang:String(cue.lang||'').toLowerCase(),text:words
+        });
+    }
+  }catch(e){
+    // Original soundtrack/visual analysis still works on media with no
+    // supported text subtitle track.
+    console.warn('Optional embedded subtitles unavailable:',e.message);
+  }
+}
+function shortBurmeseText(input,maxUnits=48){
+  const value=String(input||'').replace(/\s+/g,' ').trim();
+  if(value.length<=maxUnits)return value;
+  if(typeof Intl!=='undefined' && typeof Intl.Segmenter==='function'){
+    let result='';
+    for(const item of new Intl.Segmenter('my',{granularity:'grapheme'}).segment(value)){
+      if(result.length+item.segment.length>maxUnits)break;
+      result+=item.segment;
+    }
+    return result.trim();
+  }
+  return Array.from(value).slice(0,maxUnits).join('').trim();
+}
 function chooseNativeScenes(frames,duration,limit){
   if(!Array.isArray(frames)||!frames.length)throw Error('No native frames returned');
   const sorted=frames.filter(f=>Number.isFinite(f.time)).sort((a,b)=>a.time-b.time);
@@ -276,7 +333,7 @@ function chooseNativeScenes(frames,duration,limit){
 }
 function vector(ctx){const d=ctx.getImageData(0,0,24,14).data,out=[];for(let i=0;i<d.length;i+=4){out.push(d[i]*.299+d[i+1]*.587+d[i+2]*.114)}return out}
 function distance(a,b){if(!a||!b)return 1;let s=0;for(let i=0;i<a.length;i++)s+=Math.abs(a[i]-b[i]);return s/(a.length*255)}
-$('scanBtn').onclick=async()=>{if(busy)return;if(!currentFile){toast('Video File အရင်ရွေးပါ။');return}busy=true;fullFilmDialogueEvidence=[];$('scanBtn').disabled=true;$('scanBtn').textContent='Scanning video frames…';shotList=[];renderShots();let v=document.createElement('video');v.src=objectUrl;v.muted=true;v.preload='auto';v.playsInline=true;try{
+$('scanBtn').onclick=async()=>{if(busy)return;if(!currentFile){toast('Video File အရင်ရွေးပါ။');return}busy=true;fullFilmDialogueEvidence=[];fullFilmSubtitleEvidence=[];$('scanBtn').disabled=true;$('scanBtn').textContent='Scanning video frames…';shotList=[];renderShots();let v=document.createElement('video');v.src=objectUrl;v.muted=true;v.preload='auto';v.playsInline=true;try{
 if(window.AndroidRecap && typeof AndroidRecap.scanVideoNative==='function' && !demoMode){
   setProgress(8,'Video မြင်ကွင်းတွေ စစ်နေပါတယ်');
   const result=await scanNativeFrames();
@@ -289,6 +346,7 @@ if(window.AndroidRecap && typeof AndroidRecap.scanVideoNative==='function' && !d
   await analyzeAllFrames();
   setProgress(62,'Video အသံကို စစ်နေပါတယ်');
   await scanDialogueContext();
+  if(!cancelRequestedJS)await scanEmbeddedSubtitleContext();
   $('draft').click();setProgress($('autoBtn').disabled?82:100,'မြင်ကွင်းနဲ့ အသံ စစ်ပြီးပါပြီ');
   toast(shotList.length+' frames scanned with Android native decoder.');
   return;
@@ -323,7 +381,7 @@ async function analyzeAllFrames(){
  renderShots();
 }
 function renderShots(){$('stats').innerHTML='<span>Scenes: '+shotList.length+'</span><span>'+(shotList.length?'Auto image labels':'Ready to scan')+'</span>';let root=$('scenes');root.textContent='';if(!shotList.length){let d=document.createElement('div');d.className='empty';d.textContent='🎞️  Video Scan လုပ်ပြီးရင် Scene Timeline ဒီမှာ ပေါ်ပါမယ်။';root.append(d);return}shotList.forEach((s,i)=>{let d=document.createElement('div');d.className='scene';let img=document.createElement('img');img.src=s.thumb;img.alt='Frame at '+formatTime(s.time);img.addEventListener('click',()=>{$('preview').currentTime=s.time;$('preview').scrollIntoView({behavior:'smooth',block:'center'})});let box=document.createElement('div'),label=document.createElement('small');label.textContent='SCENE '+String(i+1).padStart(2,'0')+' • '+formatTime(s.time);let area=document.createElement('div');area.className='visualnote';area.setAttribute('aria-label','Auto visual observation for scene '+(i+1));area.textContent=(s.note || 'Analyzing scene…')+(s.dialogueEvidence?'\n🎧 '+s.dialogueEvidence:'');box.append(label,area);d.append(img,box);root.append(d)})}
-$('draft').onclick=()=>{if(!shotList.length){toast('Scene Scan အရင်လုပ်ပါ။');return}let used=shotList; if(!used.length)return;let my=$('lang').value==='my';let opening=my?'ဤစာသားသည် AI မြင်ကွင်းအချက်အလက် စမ်းသပ်ချက်သာဖြစ်ပြီး ရုပ်ရှင်ဇာတ်လမ်း အကျဉ်းချုပ်အမှန် မဟုတ်ပါ။\n\n':'Automated visual observations only. This is not a reliable movie plot recap.\n\n';let body=used.map((x,i)=>x.note.trim()).join('\n\n');let evidence=fullFilmDialogueEvidence.length?('\n\n'+(my?'[မူရင်းအသံ စာသားမှတ်တမ်း — မြန်မာဘာသာပြန် မဟုတ်ပါ]':'[Original soundtrack excerpts — not translated]')+'\n'+fullFilmDialogueEvidence.map(z=>'['+formatTime(z.time)+' • '+(z.lang||'?')+'] '+z.text).join('\n')):'';$('script').value=opening+body+evidence;toast('Visual Summary ဖန်တီးပြီးပါပြီ။')};
+$('draft').onclick=()=>{if(!shotList.length){toast('Scene Scan အရင်လုပ်ပါ။');return}let used=shotList; if(!used.length)return;let my=$('lang').value==='my';let opening=my?'ဤစာသားသည် AI မြင်ကွင်းအချက်အလက် စမ်းသပ်ချက်သာဖြစ်ပြီး ရုပ်ရှင်ဇာတ်လမ်း အကျဉ်းချုပ်အမှန် မဟုတ်ပါ။\n\n':'Automated visual observations only. This is not a reliable movie plot recap.\n\n';let body=used.map((x,i)=>x.note.trim()).join('\n\n');let evidence=fullFilmDialogueEvidence.length?('\n\n'+(my?'[မူရင်းအသံ စာသားမှတ်တမ်း — မြန်မာဘာသာပြန် မဟုတ်ပါ]':'[Original soundtrack excerpts — not translated]')+'\n'+fullFilmDialogueEvidence.map(z=>'['+formatTime(z.time)+' • '+(z.lang||'?')+'] '+z.text).join('\n')):'';let subtitles=fullFilmSubtitleEvidence.length?('\n\n'+(my?'[Video ထဲပါ မူရင်းစာတန်းများ — ဘာသာပြန် မဟုတ်ပါ]':'[Embedded original subtitles — not translated]')+'\n'+fullFilmSubtitleEvidence.slice(0,200).map(z=>'['+formatTime(z.time)+'] '+z.text).join('\n')):'';$('script').value=opening+body+evidence+subtitles;toast('Visual Summary ဖန်တီးပြီးပါပြီ။')};
 window.nativeTtsFeedback=msg=>toast(msg);
 $('speak').onclick=()=>{let s=$('script').value.trim();if(!s){toast('Script အရင်ထည့်ပါ။');return}let loc=$('lang').value==='my'?'my-MM':'en-US';if(window.AndroidRecap){AndroidRecap.speak(s,loc);return}if(!('speechSynthesis'in window)){toast('TTS မရပါ။');return}speechSynthesis.cancel();let u=new SpeechSynthesisUtterance(s.slice(0,2700));u.lang=loc;u.rate=.92;speechSynthesis.speak(u);toast('Voice Preview စတင်နေပါတယ်။')};
 $('stop').onclick=()=>{if(window.AndroidRecap)AndroidRecap.stopSpeech();if('speechSynthesis'in window)speechSynthesis.cancel()};
@@ -350,7 +408,15 @@ function buildAutoClips(){
   }
   return clips;
 }
-function briefGroundedNarration(scene,clipStart,clipEnd){
+function briefGroundedNarration(scene,clipStart,clipEnd,subtitleEvidence=
+  (typeof fullFilmSubtitleEvidence==='undefined'?[]:fullFilmSubtitleEvidence)){
+  // If the film embeds its OWN Burmese text, prefer exact source text over
+  // generic visual labels, but never call it a newly translated recap.
+  const embedded=Array.isArray(subtitleEvidence)?
+    subtitleEvidence.find(x=>/[\u1000-\u109f]/.test(x.text||'') &&
+      Number(x.time)>=clipStart && Number(x.time)<=clipEnd) : null;
+  if(embedded)return shortBurmeseText(embedded.text);
+
   const original=Array.isArray(scene.dialogueEvidenceList) ?
     scene.dialogueEvidenceList.find(x=>(x.lang==='my'||x.lang==='mya') &&
       /[\u1000-\u109f]/.test(x.text||'') &&
@@ -358,7 +424,7 @@ function briefGroundedNarration(scene,clipStart,clipEnd){
       Number.isFinite(Number(x.time)) && Number(x.time)>=clipStart &&
       Number(x.time)<=clipEnd) : null;
   // Only use original Burmese dialogue, not untranslated foreign text.
-  if(original)return String(original.text).trim().slice(0,48);
+  if(original)return shortBurmeseText(original.text);
   const names=[...new Set((scene.labels||[])
     .filter(x=>Number(x.confidence)>=.55)
     .map(x=>visualDict[String(x.label||'').toLowerCase()])
