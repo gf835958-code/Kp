@@ -153,9 +153,9 @@ const $=id=>document.getElementById(id);let currentFile=null,objectUrl=null,shot
 const fn=()=>currentFile?currentFile.name.replace(/\.[^.]+$/,''):'KP-Movie-Recap';
 function toast(msg){$('toast').textContent=msg;$('toast').style.display='block';clearTimeout(toast.t);toast.t=setTimeout(()=>$('toast').style.display='none',4000)}
 function formatTime(s){if(!Number.isFinite(s))return '00:00';let x=Math.max(0,Math.floor(s));return String(Math.floor(x/60)).padStart(2,'0')+':'+String(x%60).padStart(2,'0')}
-$('choose').onclick=e=>{e.stopPropagation();$('file').click()};$('drop').onclick=e=>{if(e.target.id==='choose')return;$('file').click()};$('drop').onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();$('file').click()}};
+$('choose').onclick=e=>{e.stopPropagation();$('file').click()};$('drop').onclick=e=>{if(e.target.id==='choose'||$('choose').disabled)return;$('file').click()};$('drop').onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();$('file').click()}};
 $('drop').ondragover=e=>{e.preventDefault();$('drop').classList.add('drag')};$('drop').ondragleave=()=>$('drop').classList.remove('drag');$('drop').ondrop=e=>{e.preventDefault();$('drop').classList.remove('drag');if(e.dataTransfer.files.length)loadFile(e.dataTransfer.files[0])};$('file').onchange=e=>{if(e.target.files.length)loadFile(e.target.files[0])};
-function loadFile(file){lastNativeDuration=0;if(!file.type.startsWith('video/'))return toast('Video File ကိုပဲ ရွေးပေးပါ။');demoMode=false;if(objectUrl)URL.revokeObjectURL(objectUrl);currentFile=file;cancelRequestedJS=false;exportingNative=false;$('cancelBtn').hidden=true;$('cancelBtn').disabled=false;objectUrl=URL.createObjectURL(file);$('preview').src=objectUrl;$('autoBtn').disabled=false;$('exportResult').hidden=true;$('progress').style.display='none';$('autoBtn').textContent='✨ မြန်မာအသံ Video ဖန်တီးမယ်';$('videoWrap').style.display='block';$('fileMeta').textContent=file.name+' • '+(file.size/1048576).toFixed(1)+' MB';shotList=[];fullFilmDialogueEvidence=[];renderShots();$('script').value='';autoStatus('✅ Video ရွေးပြီးပါပြီ။ မြန်မာအသံ Video ဖန်တီးမယ် ခလုတ်ကို နှိပ်ပါ။','ready');toast('Video ရွေးပြီးပါပြီ။');$('autoBtn').scrollIntoView({block:'center',behavior:'smooth'});}
+function loadFile(file){if(currentFile && $('autoBtn').disabled)return toast('Video ဖန်တီးနေစဉ် ဖိုင်အသစ်မရွေးနိုင်ပါ။');lastNativeDuration=0;if(!file.type.startsWith('video/'))return toast('Video File ကိုပဲ ရွေးပေးပါ။');demoMode=false;if(objectUrl)URL.revokeObjectURL(objectUrl);currentFile=file;cancelRequestedJS=false;exportingNative=false;$('cancelBtn').hidden=true;$('cancelBtn').disabled=false;objectUrl=URL.createObjectURL(file);$('preview').src=objectUrl;$('autoBtn').disabled=false;$('exportResult').hidden=true;$('progress').style.display='none';$('autoBtn').textContent='✨ မြန်မာအသံ Video ဖန်တီးမယ်';$('videoWrap').style.display='block';$('fileMeta').textContent=file.name+' • '+(file.size/1048576).toFixed(1)+' MB';shotList=[];fullFilmDialogueEvidence=[];renderShots();$('script').value='';autoStatus('✅ Video ရွေးပြီးပါပြီ။ မြန်မာအသံ Video ဖန်တီးမယ် ခလုတ်ကို နှိပ်ပါ။','ready');toast('Video ရွေးပြီးပါပြီ။');$('autoBtn').scrollIntoView({block:'center',behavior:'smooth'});}
 const demoBurmese = [
   'ဇာတ်လမ်းစမ်းသပ်မှုမှာ အရောင်တစ်ခုနဲ့ ပထမမြင်ကွင်း စတင်လာပါတယ်။',
   'နောက်ထပ်မြင်ကွင်းမှာ အရောင်ပြောင်းလဲပြီး ဇာတ်ကြောင်းတစ်ခု ဆက်သွားပါတယ်။',
@@ -394,6 +394,7 @@ window.onNativeExportProgress=percent=>{
 };
 window.onAutoExportResult=(success,message)=>{
   exportingNative=false;
+  $('choose').disabled=false;
   $('cancelBtn').hidden=true;
   $('cancelBtn').disabled=false;
   autoStatus((success?'✅ ':'❌ ')+message,success?'success':'error');
@@ -421,6 +422,7 @@ $('cancelBtn').onclick=()=>{
     AndroidRecap.cancelCurrentExport();
 };
 function stopCancelledGeneration(){
+  $('choose').disabled=false;
   $('cancelBtn').hidden=true;
   $('cancelBtn').disabled=false;
   $('autoBtn').disabled=false;
@@ -441,12 +443,14 @@ $('autoBtn').onclick=async()=>{
   $('cancelBtn').hidden=false;
   $('cancelBtn').disabled=false;
   $('autoBtn').disabled=true;
+  $('choose').disabled=true;
   $('exportResult').hidden=true;
   $('autoBtn').textContent='⏳ ဖန်တီးနေပါတယ်…';
   autoStatus('🔎 မြင်ကွင်းနဲ့ အသံကို စစ်နေပါတယ်…','running');
   await $('scanBtn').onclick();
   if(cancelRequestedJS)return stopCancelledGeneration();
   if(!shotList.length) {
+    $('choose').disabled=false;
     $('autoBtn').disabled=false;
     $('cancelBtn').hidden=true;
     $('autoBtn').textContent='✨ မြန်မာအသံ Video ဖန်တီးမယ်';
@@ -454,7 +458,7 @@ $('autoBtn').onclick=async()=>{
   }
   const plan=buildAutoCaptionPlan();
   const clips=plan.clips;
-  if(!clips.length) { $('cancelBtn').hidden=true;$('autoBtn').disabled=false;$('autoBtn').textContent='✨ မြန်မာအသံ Video ဖန်တီးမယ်';return autoStatus('❌ အသံထည့်နိုင်မယ့် Video အပိုင်းမရှိပါ။ နောက် Video တစ်ခု စမ်းပါ။','error'); }
+  if(!clips.length) { $('choose').disabled=false;$('cancelBtn').hidden=true;$('autoBtn').disabled=false;$('autoBtn').textContent='✨ မြန်မာအသံ Video ဖန်တီးမယ်';return autoStatus('❌ အသံထည့်နိုင်မယ့် Video အပိုင်းမရှိပါ။ နောက် Video တစ်ခု စမ်းပါ။','error'); }
   autoStatus('🎬 မြန်မာအသံနဲ့ စာတန်းတွေကို Video ထဲ ပေါင်းထုတ်နေပါတယ်…','running');
   setProgress(86,'မြန်မာအသံဖန်တီးပြီး MP4 ပေါင်းထုတ်နေပါတယ်');
   try {
@@ -465,6 +469,7 @@ $('autoBtn').onclick=async()=>{
     } else {
       autoStatus('❌ ဒီ App မှာ Video Export Engine မရှိပါ။','error');
       $('cancelBtn').hidden=true;
+      $('choose').disabled=false;
       $('autoBtn').disabled=false;
       $('autoBtn').textContent='✨ မြန်မာအသံ Video ဖန်တီးမယ်';
     }
